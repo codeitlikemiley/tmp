@@ -1,68 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" width="100%" height="100%">
-  <!-- Transparent background, solid dark charcoal strokes matching the schematic style -->
-  <g id="logo-content" transform="translate(10, 10)" stroke="#1a202c" fill="none" stroke-linejoin="round" stroke-linecap="round">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" width="100%" height="100%" style="background: transparent;">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eab308" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+    <linearGradient id="slateGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(10, 10)" fill="none" stroke-linejoin="round" stroke-linecap="round">
     
-    <!-- LETTER T: Mechanical Wrench (Outline style matching the schematic) -->
+    <!-- LETTER T: Thor's Hammer (Mjolnir) -->
     <g id="letter-t" transform="translate(20, 0)">
-      <!-- Wrench Handle -->
-      <path d="M 68,70 L 68,162 A 17,17 0 0,0 102,162 L 102,70 Z" stroke-width="3" />
-      <circle cx="85" cy="162" r="6" stroke-width="2" />
-      
-      <!-- Inner accent line on handle -->
-      <line x1="85" y1="80" x2="85" y2="140" stroke-width="1.5" stroke-dasharray="8,5" opacity="0.7" />
-      
-      <!-- Wrench Head / Open Jaw -->
-      <path d="M 25,40 C 25,20 60,15 85,38 C 110,15 145,20 145,40 C 145,55 130,70 120,70 L 105,70 C 105,58 95,48 85,48 C 75,48 65,58 65,70 L 50,70 C 40,70 25,55 25,40 Z" stroke-width="3" />
-      
-      <!-- Mechanical Jaw Details -->
-      <circle cx="85" cy="48" r="3" stroke-width="2" />
-      <path d="M 45,40 C 45,55 55,65 65,65" stroke-width="1.5" />
-      <path d="M 125,40 C 125,55 115,65 105,65" stroke-width="1.5" />
+      <!-- Leather loop at handle base -->
+      <path d="M 82,165 C 82,185 88,185 88,165" stroke="#334155" stroke-width="2.5" />
+      <!-- Handle -->
+      <rect x="79" y="48" width="12" height="117" rx="3" fill="#334155" />
+      <!-- Grip wraps -->
+      <line x1="79" y1="75" x2="91" y2="78" stroke="#94a3b8" stroke-width="1.5" />
+      <line x1="79" y1="95" x2="91" y2="98" stroke="#94a3b8" stroke-width="1.5" />
+      <line x1="79" y1="115" x2="91" y2="118" stroke="#94a3b8" stroke-width="1.5" />
+      <line x1="79" y1="135" x2="91" y2="138" stroke="#94a3b8" stroke-width="1.5" />
+      <!-- Rubber bottom base -->
+      <rect x="77" y="152" width="16" height="13" rx="1.5" fill="#1e293b" />
+
+      <!-- Hammer Head (Beveled Mjolnir Block) -->
+      <path d="M 35,22 L 135,22 L 140,28 L 140,42 L 135,48 L 35,48 L 30,42 L 30,28 Z" fill="#334155" stroke="url(#goldGrad)" stroke-width="2" />
+      <!-- Engraving/Runes details -->
+      <line x1="85" y1="22" x2="85" y2="48" stroke="url(#goldGrad)" stroke-width="1.5" opacity="0.8" />
+      <circle cx="85" cy="35" r="3.5" fill="url(#goldGrad)" stroke="none" />
+      <!-- Left/Right trim lines -->
+      <line x1="50" y1="26" x2="50" y2="44" stroke="#94a3b8" stroke-width="1" opacity="0.6" />
+      <line x1="120" y1="26" x2="120" y2="44" stroke="#94a3b8" stroke-width="1" opacity="0.6" />
     </g>
 
     <!-- LETTER M: Contour Mapping Lines -->
-    <g id="letter-m" transform="translate(200, 20)" stroke-width="3">
+    <g id="letter-m" transform="translate(200, 20)">
       <!-- Contour 1 (Outer M) -->
-      <path d="M 10,150 L 10,20 L 75,100 L 140,20 L 140,150" stroke-width="4.5" />
+      <path d="M 10,150 L 10,20 L 75,100 L 140,20 L 140,150" stroke="url(#goldGrad)" stroke-width="4.5" />
       <!-- Contour 2 -->
-      <path d="M 25,150 L 25,45 L 75,115 L 125,45 L 125,150" stroke-width="3.5" opacity="0.9" />
+      <path d="M 25,150 L 25,45 L 75,115 L 125,45 L 125,150" stroke="#475569" stroke-width="3.5" opacity="0.9" />
       <!-- Contour 3 -->
-      <path d="M 40,150 L 40,70 L 75,130 L 110,70 L 110,150" stroke-width="2.5" opacity="0.8" />
+      <path d="M 40,150 L 40,70 L 75,130 L 110,70 L 110,150" stroke="url(#goldGrad)" stroke-width="2.5" opacity="0.8" />
       <!-- Contour 4 -->
-      <path d="M 55,150 L 55,95 L 75,145 L 95,95 L 95,150" stroke-width="1.5" opacity="0.7" />
-      <!-- Tiny Center Hill -->
-      <path d="M 70,150 L 75,155 L 80,150" stroke-width="1.0" opacity="0.6" />
+      <path d="M 55,150 L 55,95 L 75,145 L 95,95 L 95,150" stroke="#475569" stroke-width="1.5" opacity="0.7" />
     </g>
 
-    <!-- LETTER P: Protocol Network Nodes -->
+    <!-- LETTER P: Network Protocol (Rounded loop path with nodes) -->
     <g id="letter-p" transform="translate(390, 20)">
-      <!-- Connection Lines (Network Mesh) -->
-      <g stroke-width="2" opacity="0.8">
-        <line x1="20" y1="20" x2="20" y2="150" />
-        <line x1="20" y1="20" x2="80" y2="20" />
-        <line x1="80" y1="20" x2="110" y2="55" />
-        <line x1="110" y1="55" x2="80" y2="90" />
-        <line x1="80" y1="90" x2="20" y2="90" />
-        <line x1="20" y1="20" x2="80" y2="90" />
-        <line x1="20" y1="90" x2="80" y2="20" />
-        <line x1="80" y1="20" x2="110" y2="90" />
-        <line x1="20" y1="55" x2="80" y2="55" />
-        <line x1="20" y1="90" x2="20" y2="150" />
-        <line x1="20" y1="120" x2="20" y2="150" />
+      <!-- Rounded P backbone path -->
+      <path d="M 20,20 L 20,150" stroke="#334155" stroke-width="3.5" />
+      <!-- Rounded loop -->
+      <path d="M 20,20 L 70,20 C 105,20 120,40 120,55 C 120,70 105,90 70,90 L 20,90" stroke="#334155" stroke-width="3.5" />
+
+      <!-- Network Mesh internal connections -->
+      <g stroke="#475569" stroke-width="2" opacity="0.7">
+        <line x1="20" y1="20" x2="70" y2="90" />
+        <line x1="20" y1="90" x2="70" y2="20" />
+        <line x1="20" y1="55" x2="115" y2="55" />
+        <line x1="70" y1="20" x2="70" y2="90" />
       </g>
 
-      <!-- Nodes (Connected Dots) -->
-      <circle cx="20" cy="20" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="20" cy="55" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="20" cy="90" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="20" cy="120" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="20" cy="150" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="50" cy="20" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="80" cy="20" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="110" cy="55" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="80" cy="90" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="50" cy="90" r="6" fill="#1a202c" stroke-width="1" />
-      <circle cx="80" cy="55" r="6" fill="#1a202c" stroke-width="1" />
+      <!-- Nodes (Gold circles) -->
+      <!-- Stem nodes -->
+      <circle cx="20" cy="20" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="20" cy="55" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="20" cy="90" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="20" cy="120" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="20" cy="150" r="6.5" fill="url(#goldGrad)" />
+      <!-- Loop nodes -->
+      <circle cx="70" cy="20" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="100" cy="30" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="115" cy="55" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="100" cy="80" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="70" cy="90" r="6.5" fill="url(#goldGrad)" />
+      <circle cx="70" cy="55" r="6.5" fill="url(#goldGrad)" />
     </g>
 
   </g>
