@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tokio::sync::Mutex;
-use tmp_agent::server::{AppState, create_router};
+use tmp_agent::server::{create_router, AppState};
 use tmp_core::schema::Schema;
+use tokio::sync::Mutex;
 
 struct TestCleanup {
     temp_dir: std::path::PathBuf,
@@ -146,15 +146,12 @@ async fn test_integration_workflow() {
                 name TEXT NOT NULL
             )",
             [],
-        ).expect("Failed to create test_users table");
-        conn.execute(
-            "INSERT INTO test_users (name) VALUES ('Alice')",
-            [],
-        ).expect("Failed to insert Alice");
-        conn.execute(
-            "INSERT INTO test_users (name) VALUES ('Bob')",
-            [],
-        ).expect("Failed to insert Bob");
+        )
+        .expect("Failed to create test_users table");
+        conn.execute("INSERT INTO test_users (name) VALUES ('Alice')", [])
+            .expect("Failed to insert Alice");
+        conn.execute("INSERT INTO test_users (name) VALUES ('Bob')", [])
+            .expect("Failed to insert Bob");
     }
 
     // 3. Start Axum server on dynamic port
@@ -173,7 +170,7 @@ async fn test_integration_workflow() {
     let port = addr.port();
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
-    
+
     // Set up cleanup guard
     let mut cleanup = TestCleanup {
         temp_dir: temp_dir.clone(),
@@ -209,25 +206,33 @@ async fn test_integration_workflow() {
     .await
     .expect("Spawn blocking panicked");
 
-    assert!(status.success(), "Python client script exited with non-zero code");
+    assert!(
+        status.success(),
+        "Python client script exited with non-zero code"
+    );
 
     // 6. Read generated schema and verify
     let schema_file = temp_dir.join("schemas/test_db.json");
-    assert!(schema_file.exists(), "Expected schema file was not generated");
-    
+    assert!(
+        schema_file.exists(),
+        "Expected schema file was not generated"
+    );
+
     let schema_content = std::fs::read_to_string(&schema_file).expect("Failed to read schema file");
     let parsed_schema = Schema::from_json(&schema_content).expect("Failed to parse schema JSON");
 
     assert_eq!(parsed_schema.meta.tool, "test_db");
-    assert_eq!(parsed_schema.commands.len(), 1);
-    assert_eq!(parsed_schema.commands[0].command, "select_test_users");
-    assert_eq!(parsed_schema.commands[0].group, "test_users");
+    assert_eq!(parsed_schema.operations.len(), 1);
+    assert_eq!(parsed_schema.operations[0].command, "select_test_users");
+    assert_eq!(parsed_schema.operations[0].group, "test_users");
 
     // 7. Gracefully shutdown server
     if let Some(tx) = cleanup.shutdown_tx.take() {
         let _ = tx.send(());
     }
-    server_task.await.expect("Server task panicked or failed to join");
+    server_task
+        .await
+        .expect("Server task panicked or failed to join");
 
     // Temp directory and database cleanup is handled by Drop of cleanup
 }

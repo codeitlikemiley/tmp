@@ -1,10 +1,10 @@
 use crate::context::Context;
-use crate::schema::{Schema, Token};
+use crate::schema::{Parameter, Schema};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenFill {
+pub struct ParameterFill {
     pub name: String,
     pub value: String,
     pub source: String,
@@ -16,7 +16,8 @@ pub struct ResolveResult {
     pub tool: String,
     pub explanation: String,
     pub confidence: String,
-    pub tokens_filled: Vec<TokenFill>,
+    #[serde(alias = "tokens_filled")]
+    pub parameters_filled: Vec<ParameterFill>,
 }
 
 pub fn load_all_schemas(config_path: Option<&Path>) -> Result<Vec<Schema>, String> {
@@ -56,7 +57,11 @@ fn escape_token_value(val: &str) -> String {
     escaped
 }
 
-fn construct_final_command(template: &str, tokens: &[Token], filled: &[TokenFill]) -> String {
+fn construct_final_command(
+    template: &str,
+    parameters: &[Parameter],
+    filled: &[ParameterFill],
+) -> String {
     let mut cmd = template.to_string();
 
     // 1. Replace placeholders first
@@ -76,9 +81,9 @@ fn construct_final_command(template: &str, tokens: &[Token], filled: &[TokenFill
         let placeholder1 = format!("<{}>", tf.name);
         let placeholder2 = format!("{{{}}}", tf.name);
         if !template.contains(&placeholder1) && !template.contains(&placeholder2) {
-            // Find the token definition to get its flag
-            if let Some(tok) = tokens.iter().find(|t| t.name == tf.name) {
-                if let Some(ref flag) = tok.flag {
+            // Find the parameter definition to get its flag
+            if let Some(param) = parameters.iter().find(|p| p.name == tf.name) {
+                if let Some(ref flag) = param.flag {
                     if !cmd.contains(flag) {
                         let escaped_value = escape_token_value(&tf.value);
                         cmd.push_str(&format!(" {} {}", flag, escaped_value));
@@ -89,13 +94,13 @@ fn construct_final_command(template: &str, tokens: &[Token], filled: &[TokenFill
     }
 
     // 3. Remove optional placeholders that were not filled
-    for tok in tokens {
-        if !filled.iter().any(|tf| tf.name == tok.name) {
-            let placeholder1 = format!("<{}>", tok.name);
-            let placeholder2 = format!("{{{}}}", tok.name);
+    for param in parameters {
+        if !filled.iter().any(|tf| tf.name == param.name) {
+            let placeholder1 = format!("<{}>", param.name);
+            let placeholder2 = format!("{{{}}}", param.name);
 
             // Remove `--flag <placeholder>` or just `<placeholder>`
-            if let Some(ref flag) = tok.flag {
+            if let Some(ref flag) = param.flag {
                 let pattern1 = format!("{} {}", flag, placeholder1);
                 let pattern2 = format!("{} {}", flag, placeholder2);
                 if cmd.contains(&pattern1) {
@@ -127,7 +132,7 @@ pub fn heuristic_resolve(
     let query_lower = query.to_lowercase();
     let query_words: Vec<&str> = query_lower.split_whitespace().collect();
 
-    let mut best_cmd: Option<(&crate::schema::Command, &Schema)> = None;
+    let mut best_op: Option<(&crate::schema::Operation, &Schema)> = None;
     let mut best_score = 0;
 
     for schema in schemas {
@@ -139,7 +144,7 @@ pub fn heuristic_resolve(
 
         // Filter schema relevance like compile.rs does
         if let Some(ref binary) = schema.meta.requires_binary {
-            if !is_binary_available(binary) {
+            if !crate::utils::is_binary_available(binary) {
                 continue;
             }
         }
@@ -159,10 +164,10 @@ pub fn heuristic_resolve(
             }
         }
 
-        for cmd in &schema.commands {
+        for op in &schema.operations {
             let mut score = 0;
-            let cmd_lower = cmd.command.to_lowercase();
-            let desc_lower = cmd.description.to_lowercase();
+            let cmd_lower = op.command.to_lowercase();
+            let desc_lower = op.description.to_lowercase();
 
             // Match words in query with command words
             for &word in &query_words {
@@ -177,28 +182,28 @@ pub fn heuristic_resolve(
                         score += 8;
                     }
                 }
-                if cmd.group.to_lowercase().contains(word) {
+                if op.group.to_lowercase().contains(word) {
                     score += 5;
                 }
             }
 
             if score > best_score {
                 best_score = score;
-                best_cmd = Some((cmd, schema));
+                best_op = Some((op, schema));
             }
         }
     }
 
-    if let Some((cmd, schema)) = best_cmd {
+    if let Some((op, schema)) = best_op {
         if best_score > 0 {
-            let mut tokens_filled = Vec::new();
+            let mut parameters_filled = Vec::new();
 
-            for tok in &cmd.tokens {
-                let resolved_values = match &tok.data_source {
+            for param in &op.parameters {
+                let resolved_values = match &param.data_source {
                     Some(ds) => {
                         crate::resolver::DataResolver::resolve(ds, context).unwrap_or_default()
                     }
-                    None => tok.values.clone().unwrap_or_default(),
+                    None => param.values.clone().unwrap_or_default(),
                 };
 
                 let mut filled_val = None;
@@ -215,14 +220,14 @@ pub fn heuristic_resolve(
 
                 // 2. Try default value
                 if filled_val.is_none() {
-                    if let Some(ref def) = tok.default {
+                    if let Some(ref def) = param.default {
                         filled_val = Some(def.clone());
                         source = "Default value";
                     }
                 }
 
                 // 3. If required, and still none, try to guess
-                if filled_val.is_none() && tok.required {
+                if filled_val.is_none() && param.required {
                     if let Some(&last_word) = query_words.last() {
                         if last_word != "test"
                             && last_word != "run"
@@ -236,52 +241,32 @@ pub fn heuristic_resolve(
                 }
 
                 if let Some(val) = filled_val {
-                    tokens_filled.push(TokenFill {
-                        name: tok.name.clone(),
+                    parameters_filled.push(ParameterFill {
+                        name: param.name.clone(),
                         value: val,
                         source: source.to_string(),
                     });
                 }
             }
 
-            let final_cmd = construct_final_command(&cmd.command, &cmd.tokens, &tokens_filled);
+            let final_cmd =
+                construct_final_command(&op.command, &op.parameters, &parameters_filled);
 
             return Some(ResolveResult {
                 command: final_cmd,
                 tool: schema.meta.tool.clone(),
-                explanation: cmd.description.clone(),
+                explanation: op.description.clone(),
                 confidence: if best_score > 20 {
                     "high".to_string()
                 } else {
                     "medium".to_string()
                 },
-                tokens_filled,
+                parameters_filled,
             });
         }
     }
 
     None
-}
-
-fn is_binary_available(binary: &str) -> bool {
-    let paths = match std::env::var_os("PATH") {
-        Some(val) => std::env::split_paths(&val).collect::<Vec<_>>(),
-        None => return false,
-    };
-    for mut path in paths {
-        path.push(binary);
-        if path.is_file() {
-            return true;
-        }
-        if cfg!(target_os = "windows") {
-            let mut exe_path = path.clone();
-            exe_path.set_extension("exe");
-            if exe_path.is_file() {
-                return true;
-            }
-        }
-    }
-    false
 }
 
 pub fn resolve(

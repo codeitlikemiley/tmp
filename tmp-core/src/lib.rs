@@ -9,4 +9,6 @@ pub mod resolve;
 pub mod resolver;
 pub mod run;
 pub mod schema;
+pub mod traits;
+pub mod utils;
 pub mod versioning;

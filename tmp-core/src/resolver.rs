@@ -1,8 +1,19 @@
 use crate::context::Context;
-use crate::schema::DataSource;
+use crate::schema::{DataSource, Parameter};
+use crate::traits::Resolver;
 use command::Command;
 
 pub struct DataResolver;
+
+impl Resolver for DataResolver {
+    fn values(&self, parameter: &Parameter, context: &Context) -> Result<Vec<String>, String> {
+        if let Some(ref ds) = parameter.data_source {
+            Self::resolve(ds, context)
+        } else {
+            Ok(parameter.values.clone().unwrap_or_default())
+        }
+    }
+}
 
 impl DataResolver {
     pub fn resolve(ds: &DataSource, context: &Context) -> Result<Vec<String>, String> {

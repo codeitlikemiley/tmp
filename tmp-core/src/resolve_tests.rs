@@ -1,8 +1,11 @@
 use super::*;
 use crate::context::Context;
-use crate::schema::{Command, Schema, SchemaMeta, Token, TokenType};
+use crate::schema::{
+    Approval, Effect, Operation, OutputMode, OutputPolicyConfig, Parameter, ParameterType, Risk,
+    Schema, SchemaMeta, Surface,
+};
 
-fn dummy_schema_for_resolve(tool: &str, command_str: &str, tokens: Vec<Token>) -> Schema {
+fn dummy_schema_for_resolve(tool: &str, command_str: &str, tokens: Vec<Parameter>) -> Schema {
     Schema {
         meta: SchemaMeta {
             tool: tool.to_string(),
@@ -19,12 +22,21 @@ fn dummy_schema_for_resolve(tool: &str, command_str: &str, tokens: Vec<Token>) -
             requires_binary: None,
             keywords: vec!["mykeyword".to_string()],
         },
-        commands: vec![Command {
+        operations: vec![Operation {
             command: command_str.to_string(),
             description: "Some command description".to_string(),
             group: tool.to_string(),
             verified: true,
-            tokens,
+            parameters: tokens,
+            surface: Surface::Cli,
+            effect: Effect::BuildTest,
+            risk: Risk::Low,
+            approval: Approval::NotRequired,
+            evidence: vec![],
+            output_policy: OutputPolicyConfig {
+                mode: OutputMode::Raw,
+                raw_retention: None,
+            },
         }],
     }
 }
@@ -42,21 +54,21 @@ fn test_escape_token_value() {
 #[test]
 fn test_construct_final_command() {
     let tokens = vec![
-        Token {
+        Parameter {
             name: "target".to_string(),
             description: "target token".to_string(),
             required: true,
-            token_type: TokenType::String,
+            parameter_type: ParameterType::String,
             default: None,
             values: None,
             flag: Some("--target".to_string()),
             data_source: None,
         },
-        Token {
+        Parameter {
             name: "verbose".to_string(),
             description: "verbose option".to_string(),
             required: false,
-            token_type: TokenType::Boolean,
+            parameter_type: ParameterType::Boolean,
             default: None,
             values: None,
             flag: Some("--verbose".to_string()),
@@ -67,12 +79,12 @@ fn test_construct_final_command() {
     // Case 1: Template contains placeholders
     let template = "run <target> {verbose}";
     let filled = vec![
-        TokenFill {
+        ParameterFill {
             name: "target".to_string(),
             value: "my;val".to_string(),
             source: "test".to_string(),
         },
-        TokenFill {
+        ParameterFill {
             name: "verbose".to_string(),
             value: "true".to_string(),
             source: "test".to_string(),
@@ -87,7 +99,7 @@ fn test_construct_final_command() {
     assert_eq!(res, "run --target my\\;val --verbose true");
 
     // Case 3: Optional placeholder not filled -> flag and placeholder removed
-    let filled_only_required = vec![TokenFill {
+    let filled_only_required = vec![ParameterFill {
         name: "target".to_string(),
         value: "val".to_string(),
         source: "test".to_string(),
@@ -166,21 +178,21 @@ fn test_heuristic_resolve_token_filling() {
     };
 
     let tokens = vec![
-        Token {
+        Parameter {
             name: "branch".to_string(),
             description: "branch name".to_string(),
             required: true,
-            token_type: TokenType::Enum,
+            parameter_type: ParameterType::Enum,
             default: Some("main".to_string()),
             values: Some(vec!["main".to_string(), "develop".to_string()]),
             flag: Some("-b".to_string()),
             data_source: None,
         },
-        Token {
+        Parameter {
             name: "remote".to_string(),
             description: "remote name".to_string(),
             required: false,
-            token_type: TokenType::String,
+            parameter_type: ParameterType::String,
             default: Some("origin".to_string()),
             values: None,
             flag: None,
@@ -195,7 +207,7 @@ fn test_heuristic_resolve_token_filling() {
     let res = heuristic_resolve("git checkout develop", &schemas, &context, None).unwrap();
     assert_eq!(res.command, "git checkout develop");
     let fill1 = res
-        .tokens_filled
+        .parameters_filled
         .iter()
         .find(|t| t.name == "branch")
         .unwrap();
@@ -206,7 +218,7 @@ fn test_heuristic_resolve_token_filling() {
     let res_default = heuristic_resolve("git checkout please", &schemas, &context, None).unwrap();
     assert_eq!(res_default.command, "git checkout main");
     let fill2 = res_default
-        .tokens_filled
+        .parameters_filled
         .iter()
         .find(|t| t.name == "branch")
         .unwrap();

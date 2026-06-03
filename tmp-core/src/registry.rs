@@ -199,8 +199,9 @@ impl RegistryClient {
                 tool: tool.to_string(),
                 version,
                 author,
-                commands_count: schema_val["commands"]
+                commands_count: schema_val["operations"]
                     .as_array()
+                    .or_else(|| schema_val["commands"].as_array())
                     .map(|a| a.len())
                     .unwrap_or(0),
                 verified: schema_val["meta"]["verified"].as_bool().unwrap_or(false),

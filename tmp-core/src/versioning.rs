@@ -249,7 +249,7 @@ mod tests {
                     "verified": true,
                     "keywords": []
                 }},
-                "commands": []
+                "operations": []
             }}"#,
             tool, version
         ))
