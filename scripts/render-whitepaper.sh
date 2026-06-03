@@ -23,6 +23,8 @@ pandoc "${SRC}" \
   --standalone \
   --toc \
   --number-sections \
+  --resource-path="${ROOT_DIR}/docs/whitepaper:${ROOT_DIR}" \
+  --syntax-highlighting=tango \
   --pdf-engine=typst \
   -V papersize=us-letter \
   -o "${OUT}"

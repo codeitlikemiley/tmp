@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="470" viewBox="0 0 980 470" role="img" aria-labelledby="title desc">
+  <title id="title">TMP and RTK integration</title>
+  <desc id="desc">TMP resolves an operation, decides whether RTK supports the command, and routes output to RTK, TMP-native policy, generated filter, or raw passthrough.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: 700; fill: #0f172a; }
+      .label { font-family: Arial, sans-serif; font-size: 16px; font-weight: 700; fill: #0f172a; }
+      .small { font-family: Arial, sans-serif; font-size: 13px; fill: #334155; }
+      .tiny { font-family: Arial, sans-serif; font-size: 12px; fill: #475569; }
+      .box { stroke: #334155; stroke-width: 1.8; rx: 12; }
+      .line { stroke: #334155; stroke-width: 2; fill: none; }
+    </style>
+  </defs>
+  <rect width="980" height="470" fill="#ffffff"/>
+  <text x="34" y="42" class="title">TMP + RTK: Composition, Not Replacement</text>
+  <text x="34" y="68" class="small">TMP decides the operation. RTK can compress shell output when it supports the command.</text>
+
+  <rect x="54" y="128" width="160" height="72" class="box" fill="#e0f2fe"/>
+  <text x="134" y="156" text-anchor="middle" class="label">Agent Intent</text>
+  <text x="134" y="179" text-anchor="middle" class="small">"run tests"</text>
+
+  <rect x="294" y="110" width="210" height="108" class="box" fill="#eef2ff"/>
+  <text x="399" y="142" text-anchor="middle" class="label">TMP Resolve</text>
+  <text x="399" y="168" text-anchor="middle" class="small">operation: cargo.test</text>
+  <text x="399" y="188" text-anchor="middle" class="small">effect: build-test</text>
+  <text x="399" y="208" text-anchor="middle" class="small">policy: test summary</text>
+
+  <rect x="610" y="118" width="190" height="90" class="box" fill="#fef3c7"/>
+  <text x="705" y="148" text-anchor="middle" class="label">RTK Supported?</text>
+  <text x="705" y="174" text-anchor="middle" class="small">check rewrite/filter</text>
+  <text x="705" y="194" text-anchor="middle" class="small">coverage</text>
+
+  <rect x="122" y="300" width="170" height="74" class="box" fill="#dcfce7"/>
+  <text x="207" y="328" text-anchor="middle" class="label">RTK Filter</text>
+  <text x="207" y="351" text-anchor="middle" class="small">known CLI output</text>
+
+  <rect x="356" y="300" width="170" height="74" class="box" fill="#dbeafe"/>
+  <text x="441" y="328" text-anchor="middle" class="label">TMP Policy</text>
+  <text x="441" y="351" text-anchor="middle" class="small">native parser</text>
+
+  <rect x="590" y="300" width="170" height="74" class="box" fill="#f3e8ff"/>
+  <text x="675" y="328" text-anchor="middle" class="label">Generate Draft</text>
+  <text x="675" y="351" text-anchor="middle" class="small">RTK TOML or JSON</text>
+
+  <rect x="804" y="300" width="130" height="74" class="box" fill="#fee2e2"/>
+  <text x="869" y="328" text-anchor="middle" class="label">Raw Output</text>
+  <text x="869" y="351" text-anchor="middle" class="small">last resort</text>
+
+  <rect x="328" y="414" width="354" height="42" class="box" fill="#f8fafc"/>
+  <text x="505" y="440" text-anchor="middle" class="small">structured result envelope + raw-output pointer</text>
+
+  <rect x="216" y="162" width="66" height="4" fill="#334155"/>
+  <polygon points="282,156 292,164 282,172" fill="#334155"/>
+  <rect x="506" y="162" width="92" height="4" fill="#334155"/>
+  <polygon points="598,156 608,164 598,172" fill="#334155"/>
+
+  <rect x="202" y="258" width="506" height="4" fill="#334155"/>
+  <rect x="205" y="262" width="4" height="30" fill="#334155"/>
+  <polygon points="199,292 207,302 215,292" fill="#334155"/>
+  <rect x="439" y="262" width="4" height="30" fill="#334155"/>
+  <polygon points="433,292 441,302 449,292" fill="#334155"/>
+  <rect x="673" y="262" width="4" height="30" fill="#334155"/>
+  <polygon points="667,292 675,302 683,292" fill="#334155"/>
+  <rect x="867" y="262" width="4" height="30" fill="#334155"/>
+  <polygon points="861,292 869,302 877,292" fill="#334155"/>
+  <rect x="705" y="208" width="4" height="50" fill="#334155"/>
+
+  <rect x="205" y="374" width="4" height="36" fill="#334155"/>
+  <rect x="205" y="410" width="190" height="4" fill="#334155"/>
+  <polygon points="395,404 405,412 395,420" fill="#334155"/>
+  <rect x="439" y="374" width="4" height="30" fill="#334155"/>
+  <polygon points="433,404 441,414 449,404" fill="#334155"/>
+  <rect x="673" y="374" width="4" height="30" fill="#334155"/>
+  <polygon points="667,404 675,414 683,404" fill="#334155"/>
+  <rect x="867" y="374" width="4" height="36" fill="#334155"/>
+  <rect x="682" y="410" width="189" height="4" fill="#334155"/>
+  <polygon points="682,404 672,412 682,420" fill="#334155"/>
+
+  <text x="561" y="252" class="tiny">yes: use RTK</text>
+  <text x="748" y="252" class="tiny">no: choose another policy</text>
+</svg>

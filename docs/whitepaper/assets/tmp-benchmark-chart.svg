@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="420" viewBox="0 0 980 420" role="img" aria-labelledby="title desc">
+  <title id="title">TMP benchmark measurement model</title>
+  <desc id="desc">An illustrative chart showing target reductions for tool calls, input tokens, and output bytes. Values are targets to test, not measured claims.</desc>
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: 700; fill: #0f172a; }
+      .label { font-family: Arial, sans-serif; font-size: 14px; font-weight: 700; fill: #0f172a; }
+      .small { font-family: Arial, sans-serif; font-size: 13px; fill: #334155; }
+      .axis { stroke: #334155; stroke-width: 2; }
+      .grid { stroke: #cbd5e1; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect width="980" height="420" fill="#ffffff"/>
+  <text x="34" y="42" class="title">Benchmark What TMP Claims</text>
+  <text x="34" y="68" class="small">These are acceptance targets to test with real tasks, not proof yet.</text>
+
+  <line x1="128" y1="332" x2="878" y2="332" class="axis"/>
+  <line x1="128" y1="112" x2="128" y2="332" class="axis"/>
+  <line x1="128" y1="222" x2="878" y2="222" class="grid"/>
+  <line x1="128" y1="112" x2="878" y2="112" class="grid"/>
+  <text x="84" y="336" class="small">0%</text>
+  <text x="78" y="226" class="small">50%</text>
+  <text x="70" y="116" class="small">100%</text>
+
+  <rect x="190" y="112" width="72" height="220" fill="#cbd5e1"/>
+  <rect x="274" y="222" width="72" height="110" fill="#2563eb"/>
+  <text x="226" y="354" text-anchor="middle" class="small">Baseline</text>
+  <text x="310" y="354" text-anchor="middle" class="small">TMP</text>
+  <text x="268" y="386" text-anchor="middle" class="label">Tool calls</text>
+  <text x="310" y="214" text-anchor="middle" class="small">-50%</text>
+
+  <rect x="444" y="112" width="72" height="220" fill="#cbd5e1"/>
+  <rect x="528" y="178" width="72" height="154" fill="#16a34a"/>
+  <text x="480" y="354" text-anchor="middle" class="small">Baseline</text>
+  <text x="564" y="354" text-anchor="middle" class="small">TMP</text>
+  <text x="522" y="386" text-anchor="middle" class="label">Input tokens</text>
+  <text x="564" y="170" text-anchor="middle" class="small">-30%</text>
+
+  <rect x="698" y="112" width="72" height="220" fill="#cbd5e1"/>
+  <rect x="782" y="244" width="72" height="88" fill="#dc2626"/>
+  <text x="734" y="354" text-anchor="middle" class="small">Raw</text>
+  <text x="818" y="354" text-anchor="middle" class="small">Shaped</text>
+  <text x="776" y="386" text-anchor="middle" class="label">Output bytes</text>
+  <text x="818" y="236" text-anchor="middle" class="small">-60%</text>
+
+  <text x="128" y="96" class="small">lower is better after TMP assistance</text>
+</svg>

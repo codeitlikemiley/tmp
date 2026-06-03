@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "tool": "test_workflow",
+    "version": 1,
+    "verified": true,
+    "keywords": [
+      "database",
+      "test_workflow"
+    ]
+  },
+  "commands": [
+    {
+      "command": "SELECT id, name FROM users",
+      "description": "Select all users with their ID and name",
+      "group": "users",
+      "verified": false,
+      "tokens": []
+    },
+    {
+      "command": "INSERT INTO users (name) VALUES ('John Doe')",
+      "description": "Insert a new user with a specified name",
+      "group": "users",
+      "verified": false,
+      "tokens": []
+    },
+    {
+      "command": "DELETE FROM users WHERE id = 1",
+      "description": "Delete a user by their unique ID",
+      "group": "users",
+      "verified": false,
+      "tokens": []
+    },
+    {
+      "command": "SELECT * FROM users WHERE name LIKE '%John%'",
+      "description": "Query and filter users whose name matches a search pattern",
+      "group": "users",
+      "verified": false,
+      "tokens": []
+    }
+  ]
+}

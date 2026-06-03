@@ -1,703 +1,151 @@
 ---
 title: "Tool Mapping Protocol"
-subtitle: "A deterministic mapping layer for tools, actions, APIs, queries, workflows, and agents"
+subtitle: "A deterministic map from intent to verified tools, actions, queries, workflows, and outputs"
 author: "TMP Project"
 date: "2026-06-03"
-version: "Draft 0.2"
+version: "Draft 0.4"
 lang: "en-US"
 ---
 
 # Executive Summary
 
-Tool Mapping Protocol, or TMP, is a proposed protocol for mapping human or agent intent to verified executable surfaces. In the first implementation, TMP appears as a Rust CLI that maps natural-language requests to command-line schemas. That is useful, but it is not the full design.
+Tool Mapping Protocol, or TMP, is a protocol for turning intent into a verified operation.
 
-The broader TMP design is a general mapping layer for:
+Plain English:
 
-- CLI commands.
-- HTTP and local API endpoints.
-- SQL queries and database operations.
-- Workflow actions and multi-step automations.
-- Custom scripts.
-- Terminal autocomplete and tab completion.
-- AI agent tool use.
+> TMP is a map. Before a human, terminal, or AI agent runs something, TMP shows the correct road, the required inputs, the possible side effects, and the shape of the result.
 
-TMP is not only a way to run commands. It is a way to describe what actions exist, what parameters they accept, where parameter values come from, what side effects they may have, how they are verified, and how a user or agent can safely invoke them.
+The first implementation is a Rust CLI named `tmp`, but the protocol is bigger than a CLI. TMP can map:
 
-The core claim is:
+| Surface | Example | TMP Value |
+| --- | --- | --- |
+| CLI | `cargo test` | known flags |
+| API | `POST /deployments` | schema + effects |
+| SQL | `recent_failed_jobs` | safe templates |
+| Workflow | `release_candidate` | ordered steps |
+| Script | `sync-data` | documented args |
+| Completion | `<TAB>` | dynamic values |
+| Agent tool | `resolve_intent` | grounded lookup |
+| Output policy | test summary | less noise |
 
-> Agents and terminals should not guess executable behavior. They should resolve intent through a verified map.
+TMP should create three measurable benefits:
 
-This creates three practical benefits:
+| Claim | Meaning | Evidence |
+| --- | --- | --- |
+| Grounded actions | tied to a verified map | invalid attempts |
+| Fewer tool calls | less discovery work | call delta |
+| Lower token usage | less context and noise | token/byte delta |
 
-- Grounded results: the output is tied to a known operation, not a hallucinated command or API call.
-- Lower tool-call usage: an agent can use one TMP resolution call instead of repeatedly probing files, help pages, schemas, scripts, and APIs.
-- Lower token usage: compact mappings replace repeated long-context inspection.
+![TMP layered architecture](assets/tmp-layer.png)
 
-TMP can support both interactive humans and automated agents. A terminal can use TMP for completions. An agent can use TMP for grounded action selection. A registry can distribute verified maps. A schema generator can help create maps. A benchmark harness can measure whether these claims hold.
+# The Problem
 
-# The Bigger Idea
+Modern developer environments have many ways to perform actions:
 
-Most developer tools expose useful operations, but they expose them in inconsistent ways. A CLI has flags. An API has endpoints. SQL has tables and query constraints. A workflow has steps. A script has inputs. A terminal completion engine has candidate values. An AI agent has tools with JSON schemas.
+- Commands have flags.
+- APIs have endpoints.
+- Databases have schemas and constraints.
+- Workflows have steps.
+- Scripts have undocumented arguments.
+- Terminals need completion candidates.
+- Agents need safe tool calls.
 
-All of these are different forms of the same underlying problem:
-
-```text
-intent + context -> valid operation + filled parameters + known effect
-```
-
-TMP treats that as a first-class protocol problem.
-
-Instead of building a separate resolver for every surface, TMP defines a common map. The map says:
-
-- What surface exists.
-- What operations exist on that surface.
-- What parameters each operation accepts.
-- Which parameters are required.
-- How valid parameter values can be discovered.
-- What context is needed.
-- What effect or risk the operation carries.
-- How the operation was verified.
-- How the operation should be invoked.
-
-This lets different frontends use the same mapping:
-
-- A terminal asks for tab-completion candidates.
-- An AI agent asks to resolve "run unit tests".
-- A workflow engine asks which action can deploy staging.
-- A database assistant asks which SQL queries are allowed.
-- A script runner asks what script arguments are valid.
-
-The protocol is the shared layer. The current `tmp` CLI is one adapter and one developer workflow around that layer.
-
-# Why This Matters Now
-
-Coding agents are becoming normal development tools. They can inspect code, make changes, run tests, and call tools. But tool use is still inefficient and error-prone.
-
-Without a mapping layer, an agent often has to perform many exploratory calls:
-
-1. List files.
-2. Read package files.
-3. Read README files.
-4. Search scripts.
-5. Run help commands.
-6. Inspect shell history or docs.
-7. Guess the final command.
-8. Run it.
-9. Recover if it was wrong.
-
-This creates waste:
-
-- More tool calls.
-- More tokens.
-- More latency.
-- More opportunities for hallucinated flags or wrong assumptions.
-- More user interruptions.
-
-TMP compresses that flow:
-
-1. Compile or load a verified map.
-2. Resolve intent against the map.
-3. Invoke the mapped operation.
-
-When the map is missing or uncertain, TMP should say so. That failure is valuable because it prevents a guessed action from being presented as grounded.
-
-# Use Cases
-
-## Terminal Autocomplete
-
-Terminals such as Warp, shell plugins, or custom developer terminals can use TMP to provide context-aware completion.
-
-Example:
+Without TMP, an AI agent often has to do this:
 
 ```text
-git checkout <TAB>
+read files
+  -> search scripts
+  -> inspect docs
+  -> run help
+  -> guess command
+  -> run
+  -> recover
 ```
 
-TMP can map `<branch>` to `git:branches` and return current branch names.
+That is expensive and unreliable.
 
-Example:
+With TMP, the flow becomes:
 
 ```text
-cargo run --bin <TAB>
+compile map
+  -> resolve intent
+  -> invoke verified operation
+  -> return shaped result
 ```
 
-TMP can map `<bin>` to `cargo:bins` and return binaries detected in the current workspace.
+The important rule:
 
-This is not only convenience. It makes completion project-aware and schema-aware. The terminal does not need to scrape every help page repeatedly. It can ask TMP for the operation map and dynamic parameter values.
+> If TMP cannot resolve the operation, it should fail closed. A visible "not mapped" result is better than a confident guess.
 
-## AI Agent Tool Use
+# Core Model
 
-An AI agent can use TMP as a grounding tool.
-
-Example:
+TMP is built around one unit: the operation.
 
 ```text
-User: Run the parser unit tests.
-Agent: tmp resolve "run parser unit tests"
-TMP: cargo test parser
-Agent: tmp run
+surface -> operation -> parameters -> resolvers -> invocation -> effect -> output policy
 ```
 
-The agent does not need to infer the command from scratch. It asks TMP for the mapped operation. If TMP cannot resolve the request, the agent receives a visible failure and can inspect the repo, ask the user, or generate a missing schema.
+| Term | Meaning | Example |
+| --- | --- | --- |
+| Surface | Where the action lives. | CLI, API, SQL, workflow, script. |
+| Operation | A thing that can be invoked. | `cargo.test`, `sql.recent_failed_jobs`. |
+| Parameter | Input required by the operation. | `branch`, `environment`, `limit`. |
+| Resolver | How valid values are discovered. | `git:branches`, `cargo:bins`, `sql:tables`. |
+| Invocation | The concrete action to perform. | shell command, HTTP request, query template. |
+| Effect | What can happen. | read-only, build-test, network, deployment, destructive. |
+| Output policy | How results are returned. | raw, test summary, diff summary, JSON projection. |
+| Evidence | Why the map is trusted. | help text, test, human review, registry signature. |
 
-## API Action Mapping
-
-TMP can map API operations.
-
-Example:
-
-```text
-intent: "create a staging deployment"
-surface: api
-operation: POST /deployments
-parameters:
-  environment: staging
-  ref: current git branch
-effect: deployment
-risk: high
-approval: required
-```
-
-The protocol can describe the endpoint, method, required fields, authentication context, valid values, response schema, and risk level. A terminal, workflow runner, or agent can all use the same map.
-
-## SQL Query Mapping
-
-TMP can map database operations without allowing arbitrary SQL generation.
-
-Example:
-
-```text
-intent: "show recent failed jobs"
-surface: sql
-operation: recent_failed_jobs
-query_template: SELECT id, status, created_at FROM jobs WHERE status = ? ORDER BY created_at DESC LIMIT ?
-parameters:
-  status: failed
-  limit: 50
-effect: read-only
-risk: low
-```
-
-This matters because free-form SQL generation can be dangerous. TMP can define allowed query templates, parameter sources, read/write classification, and database context.
-
-## Workflow and Action Mapping
-
-TMP can map multi-step workflows.
-
-Example:
-
-```text
-operation: release_candidate
-steps:
-  - run tests
-  - build package
-  - generate changelog
-  - publish draft artifact
-effect: write-local + network
-risk: high
-approval: required
-```
-
-The map can expose a workflow as a single operation while preserving its internal steps and risk metadata.
-
-## Custom Script Mapping
-
-Many teams rely on local scripts that are not documented well.
-
-TMP can map:
-
-- Script path.
-- Arguments.
-- Environment variables.
-- Working directory.
-- Generated files.
-- Exit behavior.
-- Dynamic completions.
-- Risk level.
-
-This turns ad hoc scripts into inspectable operations.
-
-# Core Concept
-
-TMP should be understood as a mapping protocol, not only a command schema.
-
-The fundamental unit is an operation.
-
-```text
-surface -> operation -> parameters -> resolvers -> invocation -> effect
-```
-
-## Surface
-
-A surface is where the operation lives.
-
-Examples:
-
-- CLI
-- API
-- SQL
-- Workflow
-- Script
-- Filesystem
-- Agent tool
-
-The current implementation focuses mostly on CLI surfaces. The grand design should support multiple surfaces through adapters.
-
-## Operation
-
-An operation is something that can be invoked.
-
-Examples:
-
-- `cargo test`
-- `POST /deployments`
-- `recent_failed_jobs`
-- `release_candidate`
-- `scripts/sync-data.sh`
-
-Each operation should have a stable identity, description, invocation template, parameters, effect metadata, and verification status.
-
-## Parameter
-
-A parameter is an input required by an operation.
-
-Examples:
-
-- Cargo package.
-- Git branch.
-- API environment.
-- SQL status filter.
-- Workflow target.
-- Script path.
-
-Parameters can be required or optional. They can have types, defaults, allowed values, and dynamic resolvers.
-
-## Resolver
-
-A resolver discovers valid parameter values.
-
-Examples:
-
-- `git:branches`
-- `cargo:bins`
-- `npm:scripts`
-- `api:environments`
-- `sql:tables`
-- `workflow:targets`
-- `script:args`
-
-Resolvers are one of TMP's most important ideas. They make maps dynamic without making the agent guess.
-
-## Context
-
-Context is the current state needed to resolve operations.
-
-Examples:
-
-- Repository root.
-- Current branch.
-- Build system.
-- Active database.
-- API base URL.
-- Environment.
-- User permissions.
-- Known generated files.
-
-TMP should compile context into compact artifacts for terminals and agents.
-
-## Effect
-
-An effect describes what can happen when an operation runs.
-
-Examples:
-
-- Read-only.
-- Local write.
-- Build/test.
-- Network.
-- Database write.
-- Deployment.
-- Destructive.
-
-Effects let clients decide when to ask for approval.
-
-## Evidence
-
-Evidence explains why the map should be trusted.
-
-Examples:
-
-- Parsed from help text.
-- Verified by a human.
-- Tested against command output.
-- Imported from a trusted registry.
-- Generated by an agent and reviewed.
-- Signed by a publisher.
-
-Evidence is what separates a draft map from a trusted operation.
-
-# Protocol Shape
-
-A future TMP schema should evolve from CLI-specific command records into a generalized operation map.
-
-Illustrative shape:
+## Minimal Operation Record
 
 ```json
 {
-  "meta": {
-    "tool": "example",
-    "version": 1,
-    "verified": false
-  },
-  "surfaces": [
+  "id": "cargo.test",
+  "surface": "cli",
+  "intent": ["test", "run tests", "unit tests"],
+  "template": "cargo test <test_filter>",
+  "parameters": [
     {
-      "kind": "cli",
-      "name": "cargo",
-      "operations": [
-        {
-          "id": "cargo.test",
-          "intent": ["test", "run tests", "unit tests"],
-          "template": "cargo test <test_filter>",
-          "parameters": [
-            {
-              "name": "test_filter",
-              "type": "string",
-              "required": false,
-              "resolver": "cargo:tests"
-            }
-          ],
-          "effect": "build-test",
-          "risk": "low",
-          "verified": true
-        }
-      ]
+      "name": "test_filter",
+      "type": "string",
+      "required": false,
+      "resolver": "cargo:tests"
     }
-  ]
+  ],
+  "effect": "build-test",
+  "risk": "low",
+  "output_policy": {
+    "mode": "test_summary",
+    "raw_retention": "local_file"
+  },
+  "verified": true,
+  "evidence": ["parsed_help", "dry_run", "human_review"]
 }
 ```
 
-The current Rust schema can remain a CLI-oriented subset while the broader protocol is designed.
+This record should be enough for a terminal, CLI, API adapter, registry, or agent-facing tool to understand the operation without reading a full manual.
 
-# Sequential Architecture
+# Lifecycle
 
-TMP should be easy to explain as a sequence.
+TMP should be implemented as a sequence. Each step has one job.
 
-## Stage 1: Discover
+![TMP lifecycle](assets/tmp-lifecycle.png)
 
-Collect raw surface information:
+| Step | Input | Output | Failure |
+| --- | --- | --- | --- |
+| Discover | specs, help, files | raw facts | record gaps |
+| Map | raw facts | operation map | mark draft |
+| Verify | map + samples | evidence | stay draft |
+| Compile | map + context | `.tmp/context.*` | unresolved values |
+| Resolve | intent | operation + params | no action |
+| Invoke | resolved op | result | require approval |
+| Measure | run data | metrics | no data, no claim |
 
-- CLI help text.
-- OpenAPI specs.
-- SQL schema.
-- Workflow definitions.
-- Script signatures.
-- Existing docs.
-- Repository files.
+# Use Cases
 
-## Stage 2: Map
+## Terminal Completion
 
-Convert raw information into operation maps:
-
-- Operations.
-- Parameters.
-- Resolvers.
-- Effects.
-- Context requirements.
-
-This can be deterministic, agent-assisted, or registry-imported.
-
-## Stage 3: Verify
-
-Prove the map is useful:
-
-- Run help checks.
-- Test parameter resolution.
-- Execute safe dry runs.
-- Validate SQL templates.
-- Confirm API schemas.
-- Review effect labels.
-
-## Stage 4: Compile
-
-Compile the active map for the current context:
-
-- Filter irrelevant operations.
-- Resolve dynamic values.
-- Emit terminal completion data.
-- Emit agent-readable context.
-- Emit machine-readable operation maps.
-
-## Stage 5: Resolve
-
-Resolve intent:
-
-```text
-"run parser tests" -> operation: cargo.test -> command: cargo test parser
-```
-
-or:
-
-```text
-"show failed jobs" -> operation: sql.recent_failed_jobs -> query template + parameters
-```
-
-## Stage 6: Invoke
-
-Invoke the mapped operation:
-
-- Shell command.
-- API request.
-- SQL query.
-- Workflow runner.
-- Script process.
-
-Approval can be required based on effect and risk metadata.
-
-## Stage 7: Measure
-
-Record whether TMP helped:
-
-- Did it resolve correctly?
-- How many tool calls were avoided?
-- How many tokens were saved?
-- Did it reduce hallucinations?
-- Did it reduce latency?
-- Did it improve completion accuracy?
-
-# Comparison
-
-## Without TMP
-
-An agent often performs exploratory work before it can act:
-
-```text
-read files -> search scripts -> inspect docs -> run help -> infer command -> execute -> recover
-```
-
-Problems:
-
-- Many tool calls.
-- High token usage.
-- Slow.
-- Fragile.
-- Easy to hallucinate flags.
-- Hard to know if result is grounded.
-
-## With TMP
-
-The agent asks for a mapped result:
-
-```text
-compile map -> resolve intent -> invoke operation
-```
-
-Benefits:
-
-- Fewer tool calls.
-- Lower token use.
-- Explicit failure when no map exists.
-- Dynamic completions from resolvers.
-- Reusable maps.
-- Better audit trail.
-
-## MCP and Tool Schemas Compared
-
-Model Context Protocol and tool schemas expose tools to agents. TMP is complementary.
-
-MCP can define a tool such as "run command" or "query database". TMP can define the valid operations inside that tool and how to fill their parameters from local context.
-
-In short:
-
-- MCP exposes tools to a model.
-- TMP maps valid operations behind tools.
-- OpenAPI describes HTTP APIs.
-- TMP can map API operations into agent and terminal workflows.
-- Shell completion offers candidates.
-- TMP can provide context-aware candidates from operation maps.
-
-TMP should not compete with these systems. It should become the mapping layer they can use.
-
-# Product Goals
-
-## Goal 1: Build the CLI Adapter
-
-The current `tmp` CLI is the first adapter. It should continue to support:
-
-- Schema storage.
-- Help-based draft generation.
-- Registry install.
-- Context compilation.
-- Intent resolution.
-- Command execution.
-- Terminal-readable outputs.
-
-## Goal 2: Build the Completion Adapter
-
-TMP should expose completion data for terminals:
-
-- Operation completions.
-- Parameter completions.
-- Dynamic resolver values.
-- Context-aware suggestions.
-
-This is a strong early user-facing use case because it helps humans even before full agent integration.
-
-## Goal 3: Build the Agent Adapter
-
-TMP should expose a stable agent-facing tool:
-
-- `compile_context`
-- `list_operations`
-- `resolve_intent`
-- `resolve_parameters`
-- `invoke_operation`
-- `explain_operation`
-
-This can be exposed through CLI, MCP, or another adapter.
-
-## Goal 4: Build Schema Generation Workflows
-
-AI agents can help generate maps, but generation should be outside the deterministic resolver path.
-
-Agent generation workflow:
-
-1. Inspect raw surface.
-2. Draft map.
-3. Attach evidence.
-4. Run verification.
-5. Save draft or verified schema.
-6. Publish to registry if approved.
-
-This keeps model usage optional and user-controlled.
-
-## Goal 5: Build the Registry
-
-A registry lets teams share operation maps.
-
-Registry entries should include:
-
-- Surface type.
-- Operation count.
-- Verification level.
-- Publisher.
-- Version.
-- Checksum.
-- Compatibility notes.
-- Risk metadata.
-
-## Goal 6: Build SQL and API Adapters
-
-SQL and API adapters make TMP more than CLI.
-
-SQL adapter goals:
-
-- Map allowed query templates.
-- Resolve table and column names.
-- Classify read/write risk.
-- Prevent arbitrary destructive queries by default.
-
-API adapter goals:
-
-- Import OpenAPI specs.
-- Map endpoints to operations.
-- Resolve environment and auth context.
-- Classify side effects.
-
-## Goal 7: Build Workflow and Script Adapters
-
-Workflow/script adapters should map:
-
-- Inputs.
-- Outputs.
-- Preconditions.
-- Side effects.
-- Approval requirements.
-- Dry-run behavior.
-
-# Benchmarking the Hypothesis
-
-TMP has strong claims. They should be tested.
-
-The main hypotheses are:
-
-1. TMP reduces tool-call count.
-2. TMP reduces token usage.
-3. TMP reduces hallucinated commands or invalid operations.
-4. TMP reduces time-to-correct-action.
-5. TMP improves terminal completion relevance.
-6. TMP improves agent success rate on multi-surface tasks.
-
-## Benchmark Design
-
-Use paired tasks. Each task is run in two modes:
-
-- Baseline: agent or user works without TMP.
-- TMP-assisted: agent or user can call TMP.
-
-Keep the repository, task, agent model, and environment constant.
-
-## Metrics
-
-Measure:
-
-- Number of tool calls.
-- Input tokens.
-- Output tokens.
-- Wall-clock time.
-- Whether the final operation was correct.
-- Whether an invalid command/API/query was attempted.
-- Number of user clarifications.
-- Number of failed attempts.
-- Whether approval was requested for high-risk actions.
-
-## Task Categories
-
-Benchmark tasks should cover:
-
-- CLI command resolution.
-- Terminal completion.
-- API operation selection.
-- SQL read query selection.
-- SQL write prevention.
-- Workflow invocation.
-- Custom script argument selection.
-- Missing schema handling.
-- Registry installation and reuse.
-
-## Example Benchmark Task
-
-Task:
-
-```text
-Run the unit tests for the parser package.
-```
-
-Baseline expected behavior:
-
-- Agent searches files.
-- Agent reads package metadata.
-- Agent infers command.
-- Agent runs command.
-
-TMP expected behavior:
-
-- Agent calls `tmp resolve "run parser unit tests"`.
-- TMP returns mapped command.
-- Agent runs `tmp run`.
-
-Measure whether tool calls and tokens decrease.
-
-## Completion Benchmark
-
-For terminal completion, measure:
-
-- Precision at 1.
-- Precision at 5.
-- Time to completion candidate.
-- Whether invalid candidates appear.
-- Whether dynamic values match current context.
-
-Example:
+TMP can provide context-aware completion values.
 
 ```text
 cargo run --bin <TAB>
@@ -705,162 +153,393 @@ cargo run --bin <TAB>
 
 Expected TMP behavior:
 
-- Return only current workspace binaries.
-
-## SQL Benchmark
-
-Task:
-
-```text
-Show recent failed jobs.
-```
-
-Baseline:
-
-- Agent inspects schema and writes SQL.
-
-TMP-assisted:
-
-- Agent resolves `sql.recent_failed_jobs`.
-- TMP fills parameters and classifies query as read-only.
-
-Measure:
-
-- SQL validity.
-- Number of schema-inspection calls.
-- Whether mutating SQL was avoided.
-
-## Agent Benchmark Output
-
-Every benchmark run should record:
-
 ```json
 {
-  "task_id": "cli.parser_tests",
-  "mode": "tmp_assisted",
-  "tool_calls": 2,
-  "input_tokens": 1200,
-  "output_tokens": 300,
-  "wall_time_ms": 4200,
-  "success": true,
-  "invalid_operation_attempted": false,
-  "user_clarifications": 0
+  "operation": "cargo.run_bin",
+  "parameter": "bin",
+  "values": ["tmp", "tmp-agent", "schema-gen"]
 }
 ```
 
-This makes TMP improvements measurable instead of anecdotal.
+The terminal does not need to scrape every help page. TMP already knows the operation and can use resolvers such as `cargo:bins`, `git:branches`, or `npm:scripts`.
+
+## AI Agent Tool Use
+
+An agent can call TMP before running unknown commands.
+
+```text
+User: Run parser unit tests.
+Agent: tmp resolve "run parser unit tests"
+TMP: cargo test parser
+Agent: tmp run
+```
+
+The agent no longer needs to infer the command from scratch. It also gets a failure if the action is unmapped.
+
+## API Mapping
+
+```yaml
+intent: create staging deployment
+surface: api
+operation: deployments.create
+method: POST
+path: /deployments
+parameters:
+  environment: staging
+  ref: current_git_branch
+effect: deployment
+risk: high
+approval: required
+```
+
+TMP can make API actions visible to agents and workflows without forcing the model to invent request bodies.
+
+## SQL Mapping
+
+```sql
+-- operation: sql.recent_failed_jobs
+SELECT id, status, created_at
+FROM jobs
+WHERE status = ?
+ORDER BY created_at DESC
+LIMIT ?;
+```
+
+TMP should prefer allowed query templates over free-form SQL generation. This keeps read and write risk explicit.
+
+## Workflow and Script Mapping
+
+```yaml
+operation: release_candidate
+surface: workflow
+steps:
+  - cargo.test
+  - cargo.build_release
+  - changelog.generate
+  - artifact.publish_draft
+effect: local-write + network
+risk: high
+approval: required
+```
+
+The workflow becomes one named operation with visible internal steps.
+
+# Output Shaping
+
+TMP should treat output as part of the operation contract.
+
+```text
+intent + context -> operation + parameters + invocation + output policy
+```
+
+There are two token-reduction moments:
+
+| Moment | What TMP Reduces | Example |
+| --- | --- | --- |
+| Before invocation | exploratory tool calls and long context | Resolve `run parser tests` in one call. |
+| After invocation | noisy command output | Return failing tests, not all passing test lines. |
+
+Output policies should preserve signal and collapse noise.
+
+| Command Class | Preserve | Collapse |
+| --- | --- | --- |
+| Tests | failures, panic text, compiler errors, counts, exit status | passing tests, progress lines, ANSI codes |
+| Git status | branch, staged, unstaged, untracked, ahead/behind | hints and repeated boilerplate |
+| Diffs | changed files, hunk headers, selected relevant hunks | long unchanged context |
+| Search | matched files, counts, bounded snippets | duplicates and excessive context |
+| Logs | recent errors, warnings, service, timestamp, trace IDs | repeated heartbeat lines |
+
+Raw output should still be retained locally. Compact output is for the context window; raw output is for audit and debugging.
+
+# TMP and RTK
+
+RTK stands for Rust Token Killer. RTK is a local command proxy for AI-assisted development workflows. It runs shell commands, filters noisy output, and returns a smaller result before the output reaches the agent context window.
+
+RTK is useful because terminal output often contains low-value text:
+
+- Passing test names when only failures matter.
+- Progress bars.
+- ANSI control sequences.
+- Repeated warnings.
+- Long unchanged diff context.
+- Boilerplate package-manager output.
+- Repeated log events.
+
+TMP and RTK solve different layers of the problem.
+
+| Layer | TMP | RTK |
+| --- | --- | --- |
+| Main question | What operation should run? | How should known shell output be compressed? |
+| Scope | CLI, API, SQL, workflows, scripts, completion, agents | Shell command output |
+| Trust model | verified operation maps and evidence | supported command handlers and filters |
+| Dynamic generation | can draft maps and output policies | supports known handlers plus user filters |
+| Failure mode | fail closed when no operation maps | pass through or use available filters |
+
+![TMP and RTK integration](assets/tmp-rtk-flow.png)
+
+## Combined Flow
+
+```text
+agent intent
+  -> TMP resolves a verified operation
+  -> TMP fills parameters
+  -> TMP checks effect, risk, and approval
+  -> TMP invokes the operation
+  -> RTK compresses output if the CLI command is supported
+  -> TMP wraps the result in a structured envelope
+  -> agent receives compact, grounded output
+```
+
+Example result envelope:
+
+```json
+{
+  "operation_id": "cargo.test",
+  "invocation": "cargo test",
+  "compressor": "rtk",
+  "exit_status": 101,
+  "success": false,
+  "summary": {
+    "failed_tests": 2,
+    "passed_tests": 148,
+    "first_failure": "parser::tests::rejects_invalid_escape",
+    "failure_file": "crates/parser/src/tests.rs"
+  },
+  "omitted": {
+    "passing_test_lines": 148,
+    "progress_lines": 22,
+    "ansi_sequences": "removed"
+  },
+  "raw_output": {
+    "retained": true,
+    "location": ".tmp/runs/2026-06-03T10-30-00Z/raw.log"
+  }
+}
+```
+
+## Unsupported RTK Commands
+
+RTK does not need to support every command for TMP to be valuable. If RTK has no handler or filter, TMP should choose one of four paths:
+
+| Path | When to Use | Result |
+| --- | --- | --- |
+| Use RTK | RTK supports the command or user filter. | Fast CLI output reduction. |
+| TMP-native policy | Output needs structured parsing or is not shell output. | Operation-aware summary. |
+| Generate RTK draft | Output is line-oriented and filterable. | Draft `.rtk/filters.toml` plus tests. |
+| Raw passthrough | No safe summarizer exists. | Full output plus measurement data. |
+
+Proposed command:
+
+```bash
+tmp generate rtk <operation-id>
+```
+
+This should generate a draft filter from an existing TMP operation and representative output samples. It should not silently create trusted filters.
+
+Draft RTK-compatible filter:
+
+```toml
+[filters.scripts-codegen]
+description = "Compact scripts.codegen output"
+match_command = "^\\./scripts/codegen\\b"
+strip_ansi = true
+strip_lines_matching = [
+  "^\\s*$",
+  "^Generated unchanged file:",
+  "^Checking cache"
+]
+max_lines = 80
+on_empty = "scripts.codegen: ok"
+
+[[tests.scripts-codegen]]
+name = "preserves generated file and error summary"
+input = "..."
+expected = "..."
+```
+
+Safety rule:
+
+> Generated filters are drafts until sample tests pass and a user or maintainer reviews them.
+
+# Build Blueprint
+
+This section is written so the crates can be rebuilt from scratch.
+
+## Workspace Shape
+
+| Crate | Responsibility | Must Not Own |
+| --- | --- | --- |
+| `tmp-core` | schema model, discovery, generation, compilation, resolution, invocation, registry, output policy contracts | terminal UI and CLI argument parsing |
+| `tmp` | user-facing CLI, subcommands, TUI verification, file output | protocol business logic |
+| `crates/command` | optional command execution abstractions and process helpers | TMP schema semantics |
+| `crates/tmp-agent` | optional agent-facing adapter or test harness | deterministic core resolver |
+
+The deterministic core should not call model APIs. If AI helps generate schemas or filters, the user-selected external agent should produce draft files that TMP verifies.
+
+## Required Artifacts
+
+| Artifact | Purpose |
+| --- | --- |
+| `.tmp/config.json` | Local TMP settings and registry paths. |
+| `.tmp/schemas/*.json` | Operation maps and CLI schemas. |
+| `.tmp/context.json` | Machine-readable compiled context. |
+| `.tmp/context.md` | Agent-readable compact context. |
+| `.tmp/last-resolve.json` | Last resolved operation and parameters. |
+| `.tmp/runs/*/raw.log` | Raw output retained for audit. |
+| `.tmp/runs/*/summary.json` | Structured output summary. |
+| `.rtk/filters.toml` | Optional RTK-compatible generated filter drafts. |
+
+## CLI Contract
+
+| Command | Purpose | Output Contract |
+| --- | --- | --- |
+| `tmp init` | Create local config and directories. | Files created or already exist. |
+| `tmp generate <tool>` | Draft schema from help/discovery. | `verified: false` schema version. |
+| `tmp verify <schema>` | Review or test schema. | Evidence added or errors reported. |
+| `tmp compile` | Build context and command maps. | `.tmp/context.json` and `.tmp/context.md`. |
+| `tmp resolve "<intent>"` | Match intent to operation. | operation ID, filled params, confidence. |
+| `tmp run` | Invoke last resolved operation. | exit status and output policy result. |
+| `tmp output show --last --raw` | Reveal retained raw output. | raw output path or content. |
+| `tmp schema import/list/share` | Manage local schemas. | stable JSON and human-readable summaries. |
+| `tmp registry search/install/publish` | Share verified maps. | registry metadata and checksums. |
+| `tmp workflow add/run/list` | Manage mapped workflows. | workflow execution status. |
+| `tmp generate rtk <operation-id>` | Draft RTK-compatible output filter. | unverified TOML or TMP-native policy. |
+| `tmp benchmark run` | Measure hypotheses. | benchmark JSON matching schema. |
+
+## Core Traits
+
+These are conceptual interfaces, not final Rust syntax.
+
+```rust
+trait SurfaceAdapter {
+    fn discover(&self, context: &Context) -> Vec<RawFact>;
+    fn map(&self, facts: &[RawFact]) -> Vec<OperationDraft>;
+    fn invoke(&self, op: &ResolvedOperation) -> InvocationResult;
+}
+
+trait Resolver {
+    fn values(&self, parameter: &Parameter, context: &Context) -> Vec<Value>;
+}
+
+trait OutputPolicy {
+    fn shape(&self, raw: RawOutput, op: &ResolvedOperation) -> OutputSummary;
+}
+
+trait EvidenceCheck {
+    fn verify(&self, operation: &Operation) -> EvidenceResult;
+}
+```
+
+## Fail-Closed Invariants
+
+These rules should be tested.
+
+| Invariant | Why It Matters |
+| --- | --- |
+| Unknown intent does not invoke anything. | Prevents hallucinated operations. |
+| Draft maps are never treated as verified. | Prevents false trust. |
+| High-risk effects require approval. | Prevents accidental destructive actions. |
+| Dynamic resolver failure is visible. | Prevents hidden wrong defaults. |
+| Raw output is retained when output is shaped. | Preserves auditability. |
+| Generated RTK filters remain draft until tested. | Prevents lossy generated compression. |
+| The core resolver is deterministic. | Keeps TMP independent of AI providers. |
+
+## Minimum Test Suite
+
+| Area | Tests |
+| --- | --- |
+| Schema | parse, validate, reject invalid parameter names, preserve versions. |
+| Discovery | parse help text, mark drafts unverified, handle missing commands. |
+| Compile | write context artifacts, resolve dynamic values, keep output compact. |
+| Resolve | select expected operation, fill parameters, fail closed. |
+| Run | execute dry run and real command, store raw and summary output. |
+| Output policy | preserve failure signal, record omitted counts, keep raw pointer. |
+| Registry | install, share, publish metadata, checksum verification. |
+| End-to-end | init -> generate -> verify -> compile -> resolve -> run. |
+| Benchmarks | compare baseline vs TMP-assisted metrics. |
+
+# Product Roadmap
+
+| Phase | Goal | Exit Criteria |
+| --- | --- | --- |
+| 1 | Stabilize CLI mapping | schemas, compile, resolve, run pass end-to-end tests. |
+| 2 | General operation map | surface, effect, evidence, output policy fields exist. |
+| 3 | Completion adapter | dynamic parameter completions work for common CLI cases. |
+| 4 | Output policy adapter | tests, diffs, status, search, and logs can be summarized. |
+| 5 | Agent adapter | list, resolve, invoke, explain, read summary, read raw. |
+| 6 | Registry | verified maps can be shared with checksums and trust metadata. |
+| 7 | SQL/API/workflow adapters | non-CLI operations can be mapped and invoked safely. |
+| 8 | Benchmark harness | claims are measured and published. |
+
+# Benchmark Plan
+
+TMP should not rely on claims. It should measure them.
+
+![TMP benchmark measurement model](assets/tmp-benchmark-chart.png)
+
+| Metric | Baseline | TMP-Assisted | Target |
+| --- | --- | --- | --- |
+| Tool calls | Agent discovers manually. | Agent resolves through TMP. | 50% reduction for common CLI tasks. |
+| Input tokens | Agent reads docs, files, help. | Agent reads compact context. | 30% reduction for discovery-heavy tasks. |
+| Output tokens | Raw command output enters context. | Output policy shapes result. | 60% reduction for noisy commands. |
+| Invalid operations | Agent may guess wrong. | TMP fails closed. | Zero for verified maps. |
+| Completion precision | Shell guesses or generic completion. | TMP resolver candidates. | 90% precision at 5. |
+
+Benchmark run record:
+
+```json
+{
+  "run_id": "2026-06-03T00-00-00Z-cli-parser-tests",
+  "task_id": "cli.parser_tests",
+  "mode": "tmp_assisted",
+  "surface": "cli",
+  "tool_calls": 2,
+  "input_tokens": 1200,
+  "output_tokens": 300,
+  "raw_output_bytes": 24000,
+  "shaped_output_bytes": 2600,
+  "output_signal_preserved": true,
+  "wall_time_ms": 4200,
+  "success": true,
+  "invalid_operation_attempted": false,
+  "user_clarifications": 0,
+  "failed_attempts": 0
+}
+```
+
+# Comparison With Adjacent Systems
+
+| System | What It Does | TMP Relationship |
+| --- | --- | --- |
+| MCP | Exposes tools to models. | TMP maps valid operations behind those tools. |
+| OpenAPI | Describes HTTP APIs. | TMP imports or maps API operations into safe workflows. |
+| Shell completion | Provides command candidates. | TMP supplies context-aware operation and parameter candidates. |
+| RTK | Compresses supported shell command output. | TMP can use RTK as a CLI output adapter. |
+| Workflow engines | Run ordered steps. | TMP maps workflows as operations with effects and approvals. |
+
+TMP should not compete with these systems. It should be the mapping layer they can use.
 
 # Architecture Risks
 
-TMP can fail if its architecture becomes too vague. To avoid that, it needs firm boundaries.
-
-## Risk: Everything Becomes a Tool
-
-If every possible action is mapped without structure, TMP becomes another noisy registry.
-
-Correction:
-
-- Use clear surface types.
-- Require operation identity.
-- Require parameter definitions.
-- Require effect metadata.
-
-## Risk: Draft Maps Are Treated as Verified
-
-Agent-generated maps may look convincing while still being wrong.
-
-Correction:
-
-- Mark generated maps as draft.
-- Attach evidence.
-- Require verification before high-trust use.
-
-## Risk: The CLI Becomes the Whole Protocol
-
-The current implementation can bias the design toward shell commands only.
-
-Correction:
-
-- Treat CLI as one adapter.
-- Design generic operation maps.
-- Add SQL/API/workflow/script examples early.
-
-## Risk: TMP Becomes an AI Provider Wrapper
-
-Provider integration creates credential and trust problems.
-
-Correction:
-
-- Keep generation optional and external.
-- Let user-selected agents generate maps.
-- Keep deterministic resolution separate from model calls.
-
-# Roadmap
-
-## Phase 1: Ground the Current CLI Implementation
-
-- Stabilize schema storage.
-- Improve deterministic help parsing.
-- Keep generated schemas unverified.
-- Improve context compilation.
-- Improve resolver accuracy.
-
-## Phase 2: Define the General Operation Map
-
-- Add surface types.
-- Add effect metadata.
-- Add evidence metadata.
-- Add operation IDs.
-- Add adapter boundaries.
-
-## Phase 3: Completion Prototype
-
-- Expose completions for shell/terminal integration.
-- Measure precision and latency.
-- Support dynamic values.
-
-## Phase 4: Agent Adapter
-
-- Add a small agent-facing interface for listing, resolving, and explaining operations.
-- Support one-call intent resolution.
-- Track tool-call and token reduction.
-
-## Phase 5: Registry
-
-- Publish verified operation maps.
-- Add checksums.
-- Add compatibility metadata.
-- Add trust levels.
-
-## Phase 6: SQL/API/Workflow Adapters
-
-- Add OpenAPI import.
-- Add SQL template maps.
-- Add workflow operation maps.
-- Add script operation maps.
-
-## Phase 7: Benchmark Harness
-
-- Create benchmark scenarios.
-- Record tokens, tool calls, latency, and success.
-- Compare baseline against TMP-assisted flows.
-- Publish results.
+| Risk | Failure Mode | Correction |
+| --- | --- | --- |
+| Everything becomes a tool | Registry becomes noisy and vague. | Require operation IDs, parameters, effects, and evidence. |
+| Draft maps look trusted | Agent-generated schemas are accepted too early. | Keep `verified: false` until evidence passes. |
+| CLI dominates the design | SQL/API/workflow cases become afterthoughts. | Keep surface adapters in the core model. |
+| TMP becomes an AI wrapper | Provider keys and model behavior enter the resolver. | Keep generation external and resolver deterministic. |
+| Compression hides evidence | Agent misses important failures. | Retain raw output and benchmark signal preservation. |
+| Registry trust is weak | Users install unsafe maps. | Use checksums, publisher metadata, compatibility, and review status. |
 
 # Conclusion
 
-TMP should be framed as a protocol for mapping intent to verified operations across many executable surfaces. CLI commands are the first implementation, not the end state.
+TMP is a protocol for mapping intent to verified operations.
 
-The important insight is that terminals, agents, workflows, APIs, SQL systems, and scripts all need the same thing: a grounded map from intent to valid action.
+The simplest explanation is:
 
-If TMP succeeds, it can become a shared infrastructure layer that improves:
+```text
+Ask -> Map -> Verify -> Run -> Summarize -> Measure
+```
 
-- Terminal completion.
-- AI agent reliability.
-- Tool-call efficiency.
-- Token efficiency.
-- Command and query safety.
-- Workflow discoverability.
-- Registry-based reuse.
+If TMP succeeds, it becomes shared infrastructure for terminals, agents, workflows, APIs, SQL systems, scripts, and registries. Its value is not only running commands. Its value is making actions knowable before they run and measurable after they run.
 
-The next step is to ground the broad design through prototypes and benchmarks. TMP should not only claim fewer hallucinations and lower token usage. It should measure those claims and let the results guide the roadmap.
-
+The implementation should stay deterministic at the core, support external agent-assisted generation only as draft input, and prove its claims through benchmarks.

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520" role="img" aria-labelledby="title desc">
+  <title id="title">TMP layered architecture</title>
+  <desc id="desc">Humans, terminals, and agents send intent to TMP. TMP maps intent to verified operations across CLI, API, SQL, workflows, and scripts, then returns grounded results.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 26px; font-weight: 700; fill: #0f172a; }
+      .label { font-family: Arial, sans-serif; font-size: 17px; font-weight: 700; fill: #0f172a; }
+      .small { font-family: Arial, sans-serif; font-size: 14px; fill: #334155; }
+      .tiny { font-family: Arial, sans-serif; font-size: 12px; fill: #475569; }
+      .box { stroke: #334155; stroke-width: 2; rx: 12; }
+      .soft { stroke: #94a3b8; stroke-width: 1.5; rx: 10; }
+      .line { stroke: #334155; stroke-width: 2.2; fill: none; }
+    </style>
+  </defs>
+
+  <rect width="980" height="520" fill="#ffffff"/>
+  <text x="36" y="44" class="title">Tool Mapping Protocol: One Map, Many Surfaces</text>
+  <text x="36" y="72" class="small">TMP turns intent into a verified operation before anything runs.</text>
+
+  <rect x="38" y="118" width="190" height="68" class="soft" fill="#e0f2fe"/>
+  <text x="133" y="145" text-anchor="middle" class="label">Human</text>
+  <text x="133" y="166" text-anchor="middle" class="small">plain request</text>
+
+  <rect x="38" y="230" width="190" height="68" class="soft" fill="#dcfce7"/>
+  <text x="133" y="257" text-anchor="middle" class="label">Terminal</text>
+  <text x="133" y="278" text-anchor="middle" class="small">completion</text>
+
+  <rect x="38" y="342" width="190" height="68" class="soft" fill="#fef3c7"/>
+  <text x="133" y="369" text-anchor="middle" class="label">AI Agent</text>
+  <text x="133" y="390" text-anchor="middle" class="small">tool request</text>
+
+  <rect x="336" y="132" width="310" height="278" class="box" fill="#eef2ff"/>
+  <text x="491" y="164" text-anchor="middle" class="label">TMP Operation Map</text>
+  <text x="491" y="191" text-anchor="middle" class="small">intent -> operation -> parameters</text>
+  <text x="491" y="214" text-anchor="middle" class="small">resolvers -> effect -> output policy</text>
+
+  <rect x="374" y="244" width="118" height="46" class="soft" fill="#ffffff"/>
+  <text x="433" y="272" text-anchor="middle" class="tiny">verify</text>
+  <rect x="506" y="244" width="118" height="46" class="soft" fill="#ffffff"/>
+  <text x="565" y="272" text-anchor="middle" class="tiny">resolve</text>
+  <rect x="374" y="306" width="118" height="46" class="soft" fill="#ffffff"/>
+  <text x="433" y="334" text-anchor="middle" class="tiny">approve</text>
+  <rect x="506" y="306" width="118" height="46" class="soft" fill="#ffffff"/>
+  <text x="565" y="334" text-anchor="middle" class="tiny">measure</text>
+
+  <rect x="764" y="88" width="170" height="54" class="soft" fill="#fee2e2"/>
+  <text x="849" y="120" text-anchor="middle" class="label">CLI</text>
+  <rect x="764" y="158" width="170" height="54" class="soft" fill="#dbeafe"/>
+  <text x="849" y="190" text-anchor="middle" class="label">API</text>
+  <rect x="764" y="228" width="170" height="54" class="soft" fill="#dcfce7"/>
+  <text x="849" y="260" text-anchor="middle" class="label">SQL</text>
+  <rect x="764" y="298" width="170" height="54" class="soft" fill="#fef9c3"/>
+  <text x="849" y="330" text-anchor="middle" class="label">Workflow</text>
+  <rect x="764" y="368" width="170" height="54" class="soft" fill="#f3e8ff"/>
+  <text x="849" y="400" text-anchor="middle" class="label">Script</text>
+
+  <rect x="230" y="150" width="96" height="4" fill="#334155"/>
+  <polygon points="326,144 336,152 326,160" fill="#334155"/>
+  <rect x="230" y="262" width="96" height="4" fill="#334155"/>
+  <polygon points="326,256 336,264 326,272" fill="#334155"/>
+  <rect x="230" y="374" width="96" height="4" fill="#334155"/>
+  <polygon points="326,368 336,376 326,384" fill="#334155"/>
+
+  <rect x="646" y="113" width="108" height="4" fill="#334155"/>
+  <polygon points="754,107 764,115 754,123" fill="#334155"/>
+  <rect x="646" y="183" width="108" height="4" fill="#334155"/>
+  <polygon points="754,177 764,185 754,193" fill="#334155"/>
+  <rect x="646" y="253" width="108" height="4" fill="#334155"/>
+  <polygon points="754,247 764,255 754,263" fill="#334155"/>
+  <rect x="646" y="323" width="108" height="4" fill="#334155"/>
+  <polygon points="754,317 764,325 754,333" fill="#334155"/>
+  <rect x="646" y="393" width="108" height="4" fill="#334155"/>
+  <polygon points="754,387 764,395 754,403" fill="#334155"/>
+
+  <rect x="325" y="452" width="356" height="44" class="soft" fill="#f8fafc"/>
+  <text x="503" y="480" text-anchor="middle" class="small">grounded result + raw evidence + benchmark metrics</text>
+</svg>

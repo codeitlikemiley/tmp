@@ -1,0 +1,19 @@
+[package]
+name = "tmp-agent"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tmp-core = { path = "../../tmp-core" }
+antigravity-sdk-rust = { path = "../../../antigravity-sdk-rust" }
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["json", "http2"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+tokio-postgres = "0.7"
+uuid = { version = "1", features = ["v4", "serde"] }
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"

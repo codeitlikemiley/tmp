@@ -25,11 +25,30 @@
     },
     "mode": {
       "type": "string",
-      "enum": ["baseline", "tmp_assisted", "tmp_completion", "tmp_registry", "tmp_generated_schema"]
+      "enum": [
+        "baseline",
+        "tmp_assisted",
+        "tmp_completion",
+        "tmp_registry",
+        "tmp_generated_schema",
+        "tmp_output_policy",
+        "tmp_rtk",
+        "tmp_generated_rtk_filter"
+      ]
     },
     "surface": {
       "type": "string",
-      "enum": ["cli", "completion", "api", "sql", "workflow", "script", "registry", "failure"]
+      "enum": [
+        "cli",
+        "completion",
+        "api",
+        "sql",
+        "workflow",
+        "script",
+        "output_policy",
+        "registry",
+        "failure"
+      ]
     },
     "agent": {
       "type": "string"
@@ -48,6 +67,30 @@
     "output_tokens": {
       "type": "integer",
       "minimum": 0
+    },
+    "raw_output_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "shaped_output_bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_signal_preserved": {
+      "type": "boolean"
+    },
+    "output_compressor": {
+      "type": "string",
+      "enum": ["none", "tmp_builtin", "rtk", "rtk_generated_filter", "external"]
+    },
+    "rtk_supported": {
+      "type": "boolean"
+    },
+    "generated_filter_reviewed": {
+      "type": "boolean"
+    },
+    "generated_filter_verified": {
+      "type": "boolean"
     },
     "wall_time_ms": {
       "type": "integer",

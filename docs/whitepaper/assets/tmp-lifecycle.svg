@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="300" viewBox="0 0 980 300" role="img" aria-labelledby="title desc">
+  <title id="title">TMP lifecycle</title>
+  <desc id="desc">The TMP lifecycle moves from discovery through mapping, verification, compilation, resolution, invocation, and measurement.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 24px; font-weight: 700; fill: #0f172a; }
+      .label { font-family: Arial, sans-serif; font-size: 15px; font-weight: 700; fill: #0f172a; }
+      .small { font-family: Arial, sans-serif; font-size: 12px; fill: #334155; }
+      .box { stroke: #334155; stroke-width: 1.8; rx: 12; }
+      .line { stroke: #334155; stroke-width: 2; fill: none; }
+    </style>
+  </defs>
+  <rect width="980" height="300" fill="#ffffff"/>
+  <text x="34" y="42" class="title">Seven-Step TMP Lifecycle</text>
+  <text x="34" y="68" class="small">The protocol is simple when each step has one job.</text>
+
+  <g transform="translate(34 112)">
+    <rect width="112" height="92" class="box" fill="#e0f2fe"/>
+    <text x="56" y="30" text-anchor="middle" class="label">1 Discover</text>
+    <text x="56" y="55" text-anchor="middle" class="small">help, specs,</text>
+    <text x="56" y="72" text-anchor="middle" class="small">schemas</text>
+  </g>
+  <g transform="translate(164 112)">
+    <rect width="112" height="92" class="box" fill="#dcfce7"/>
+    <text x="56" y="30" text-anchor="middle" class="label">2 Map</text>
+    <text x="56" y="55" text-anchor="middle" class="small">operations</text>
+    <text x="56" y="72" text-anchor="middle" class="small">and params</text>
+  </g>
+  <g transform="translate(294 112)">
+    <rect width="112" height="92" class="box" fill="#fef3c7"/>
+    <text x="56" y="30" text-anchor="middle" class="label">3 Verify</text>
+    <text x="56" y="55" text-anchor="middle" class="small">prove it</text>
+    <text x="56" y="72" text-anchor="middle" class="small">works</text>
+  </g>
+  <g transform="translate(424 112)">
+    <rect width="112" height="92" class="box" fill="#f3e8ff"/>
+    <text x="56" y="30" text-anchor="middle" class="label">4 Compile</text>
+    <text x="56" y="55" text-anchor="middle" class="small">local</text>
+    <text x="56" y="72" text-anchor="middle" class="small">context</text>
+  </g>
+  <g transform="translate(554 112)">
+    <rect width="112" height="92" class="box" fill="#fee2e2"/>
+    <text x="56" y="30" text-anchor="middle" class="label">5 Resolve</text>
+    <text x="56" y="55" text-anchor="middle" class="small">intent to</text>
+    <text x="56" y="72" text-anchor="middle" class="small">operation</text>
+  </g>
+  <g transform="translate(684 112)">
+    <rect width="112" height="92" class="box" fill="#dbeafe"/>
+    <text x="56" y="30" text-anchor="middle" class="label">6 Invoke</text>
+    <text x="56" y="55" text-anchor="middle" class="small">run safely</text>
+    <text x="56" y="72" text-anchor="middle" class="small">with output</text>
+  </g>
+  <g transform="translate(814 112)">
+    <rect width="112" height="92" class="box" fill="#f8fafc"/>
+    <text x="56" y="30" text-anchor="middle" class="label">7 Measure</text>
+    <text x="56" y="55" text-anchor="middle" class="small">tokens, time,</text>
+    <text x="56" y="72" text-anchor="middle" class="small">correctness</text>
+  </g>
+
+  <rect x="148" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="160,150 170,158 160,166" fill="#334155"/>
+  <rect x="278" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="290,150 300,158 290,166" fill="#334155"/>
+  <rect x="408" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="420,150 430,158 420,166" fill="#334155"/>
+  <rect x="538" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="550,150 560,158 550,166" fill="#334155"/>
+  <rect x="668" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="680,150 690,158 680,166" fill="#334155"/>
+  <rect x="798" y="156" width="12" height="4" fill="#334155"/>
+  <polygon points="810,150 820,158 810,166" fill="#334155"/>
+</svg>
