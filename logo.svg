@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 220" width="100%" height="100%">
+  <!-- Transparent background, solid dark charcoal strokes matching the schematic style -->
+  <g id="logo-content" transform="translate(10, 10)" stroke="#1a202c" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    
+    <!-- LETTER T: Mechanical Wrench (Outline style matching the schematic) -->
+    <g id="letter-t" transform="translate(20, 0)">
+      <!-- Wrench Handle -->
+      <path d="M 68,70 L 68,162 A 17,17 0 0,0 102,162 L 102,70 Z" stroke-width="3" />
+      <circle cx="85" cy="162" r="6" stroke-width="2" />
+      
+      <!-- Inner accent line on handle -->
+      <line x1="85" y1="80" x2="85" y2="140" stroke-width="1.5" stroke-dasharray="8,5" opacity="0.7" />
+      
+      <!-- Wrench Head / Open Jaw -->
+      <path d="M 25,40 C 25,20 60,15 85,38 C 110,15 145,20 145,40 C 145,55 130,70 120,70 L 105,70 C 105,58 95,48 85,48 C 75,48 65,58 65,70 L 50,70 C 40,70 25,55 25,40 Z" stroke-width="3" />
+      
+      <!-- Mechanical Jaw Details -->
+      <circle cx="85" cy="48" r="3" stroke-width="2" />
+      <path d="M 45,40 C 45,55 55,65 65,65" stroke-width="1.5" />
+      <path d="M 125,40 C 125,55 115,65 105,65" stroke-width="1.5" />
+    </g>
+
+    <!-- LETTER M: Contour Mapping Lines -->
+    <g id="letter-m" transform="translate(200, 20)" stroke-width="3">
+      <!-- Contour 1 (Outer M) -->
+      <path d="M 10,150 L 10,20 L 75,100 L 140,20 L 140,150" stroke-width="4.5" />
+      <!-- Contour 2 -->
+      <path d="M 25,150 L 25,45 L 75,115 L 125,45 L 125,150" stroke-width="3.5" opacity="0.9" />
+      <!-- Contour 3 -->
+      <path d="M 40,150 L 40,70 L 75,130 L 110,70 L 110,150" stroke-width="2.5" opacity="0.8" />
+      <!-- Contour 4 -->
+      <path d="M 55,150 L 55,95 L 75,145 L 95,95 L 95,150" stroke-width="1.5" opacity="0.7" />
+      <!-- Tiny Center Hill -->
+      <path d="M 70,150 L 75,155 L 80,150" stroke-width="1.0" opacity="0.6" />
+    </g>
+
+    <!-- LETTER P: Protocol Network Nodes -->
+    <g id="letter-p" transform="translate(390, 20)">
+      <!-- Connection Lines (Network Mesh) -->
+      <g stroke-width="2" opacity="0.8">
+        <line x1="20" y1="20" x2="20" y2="150" />
+        <line x1="20" y1="20" x2="80" y2="20" />
+        <line x1="80" y1="20" x2="110" y2="55" />
+        <line x1="110" y1="55" x2="80" y2="90" />
+        <line x1="80" y1="90" x2="20" y2="90" />
+        <line x1="20" y1="20" x2="80" y2="90" />
+        <line x1="20" y1="90" x2="80" y2="20" />
+        <line x1="80" y1="20" x2="110" y2="90" />
+        <line x1="20" y1="55" x2="80" y2="55" />
+        <line x1="20" y1="90" x2="20" y2="150" />
+        <line x1="20" y1="120" x2="20" y2="150" />
+      </g>
+
+      <!-- Nodes (Connected Dots) -->
+      <circle cx="20" cy="20" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="20" cy="55" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="20" cy="90" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="20" cy="120" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="20" cy="150" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="50" cy="20" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="80" cy="20" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="110" cy="55" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="80" cy="90" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="50" cy="90" r="6" fill="#1a202c" stroke-width="1" />
+      <circle cx="80" cy="55" r="6" fill="#1a202c" stroke-width="1" />
+    </g>
+
+  </g>
+</svg>

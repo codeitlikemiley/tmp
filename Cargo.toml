@@ -4,4 +4,5 @@ members = [
     "tmp-core",
     "tmp",
     "crates/command",
+    "crates/tmp-agent",
 ]

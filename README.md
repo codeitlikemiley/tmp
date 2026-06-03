@@ -1,5 +1,9 @@
 # Tool Mapping Protocol (`tmp`)
 
+<p align="center">
+  <img src="logo.svg" alt="Tool Mapping Protocol (TMP) Logo" width="400" />
+</p>
+
 `tmp` is a deterministic CLI helper for making command knowledge available to external coding agents such as Claude Code, Codex, Cursor, Copilot, and similar tools. It stores command schemas, compiles workspace context, resolves natural-language intent against installed schemas with local heuristics, and runs the selected command or file context.
 
 `tmp` does not call language model APIs or manage provider keys. If a user wants model-assisted schema authoring, they can use their preferred external agent to inspect help text, edit schema JSON, and then use `tmp schema import`, `tmp generate`, `tmp compile`, `tmp resolve`, and `tmp run`.
