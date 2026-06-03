@@ -2,3 +2,6 @@ target/
 .tmp/
 .agents/
 *.rs.bk
+ORIGINAL_REQUEST.md
+*.db
+workflow.py
