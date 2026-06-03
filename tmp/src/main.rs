@@ -6,7 +6,7 @@ pub mod tui;
 
 #[derive(Parser)]
 #[command(name = "tmp")]
-#[command(about = "Terminal Meta Protocol CLI", long_about = None)]
+#[command(about = "Tool Mapping Protocol CLI", long_about = None)]
 pub struct Cli {
     #[arg(short, long, help = "Custom configuration path")]
     pub config: Option<String>,
@@ -48,15 +48,9 @@ pub enum Commands {
 
         #[arg(
             long,
-            help = "Path to a file containing help text, or a directory to recursively check help"
+            help = "Path to help text, directory containing the tool, or command to inspect"
         )]
         help_text: Option<String>,
-
-        #[arg(long, help = "Override LLM provider")]
-        provider: Option<String>,
-
-        #[arg(long, help = "Override LLM model")]
-        model: Option<String>,
 
         #[arg(long, help = "Rollback schema to a specified version")]
         rollback: Option<u32>,
@@ -110,9 +104,12 @@ pub enum Commands {
         subcommand: WorkflowSubcommands,
     },
 
-    #[command(name = "init-agent", about = "Initialize files for an AI agent")]
+    #[command(
+        name = "init-agent",
+        about = "Initialize instruction files for external coding agents"
+    )]
     InitAgent {
-        #[arg(help = "Name of the agent (e.g. claude, chatgpt)")]
+        #[arg(help = "Name of the agent (e.g. claude, codex)")]
         agent: String,
     },
 }
@@ -239,8 +236,6 @@ pub fn run_cli(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Commands::Generate {
             tool,
             help_text,
-            provider,
-            model,
             rollback,
             history,
             non_interactive,
@@ -251,8 +246,6 @@ pub fn run_cli(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 &tool,
                 cli.config.as_deref(),
                 help_text.as_deref(),
-                provider.as_deref(),
-                model.as_deref(),
                 rollback,
                 history,
                 verify,

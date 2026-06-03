@@ -1,12 +1,13 @@
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
-use tmp_core::config::{default_config_path, load_config};
+use tmp_core::config::default_config_path;
 use tmp_core::context::Context;
+use tmp_core::generate::generate_schema_from_help;
 use tmp_core::help::parse_recursive_help;
-use tmp_core::llm::LlmDispatcher;
 use tmp_core::versioning::{
-    generate_diff, get_history, get_latest_version, load_schema, rollback, save_schema,
+    generate_diff, get_history_for_config, get_latest_version_for_config, load_schema_for_config,
+    rollback_for_config, save_schema_for_config,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -14,8 +15,6 @@ pub fn run(
     tool: &str,
     custom_config_path: Option<&str>,
     help_text_opt: Option<&str>,
-    provider_opt: Option<&str>,
-    model_opt: Option<&str>,
     rollback_opt: Option<u32>,
     history: bool,
     verify: bool,
@@ -31,7 +30,7 @@ pub fn run(
         return Err("Invalid tool name".into());
     }
 
-    // 2. Load config
+    // 2. Resolve config path for schema storage/versioning.
     let config_file_path = match custom_config_path {
         Some(p) => PathBuf::from(p),
         None => match default_config_path() {
@@ -39,11 +38,11 @@ pub fn run(
             None => return Err("Could not determine default config directory.".into()),
         },
     };
-    let config = load_config(Some(&config_file_path))?;
 
     // 3. Handle history tracking
     if history {
-        let hist = get_history(tool).map_err(|e| format!("History error: {e}"))?;
+        let hist = get_history_for_config(tool, Some(&config_file_path))
+            .map_err(|e| format!("History error: {e}"))?;
         if hist.is_empty() {
             return Err(format!("No history found for tool: {tool}").into());
         }
@@ -58,7 +57,8 @@ pub fn run(
 
     // 4. Handle rollback
     if let Some(target_ver) = rollback_opt {
-        rollback(tool, target_ver).map_err(|e| format!("Rollback failed: {e}"))?;
+        rollback_for_config(tool, target_ver, Some(&config_file_path))
+            .map_err(|e| format!("Rollback failed: {e}"))?;
         println!("Rolled back schema for {tool} to version {target_ver}");
         return Ok(());
     }
@@ -76,23 +76,26 @@ pub fn run(
             };
             parse_recursive_help(&bin_to_run).map_err(|e| format!("Recursive help failed: {e}"))?
         } else {
-            fs::read_to_string(&path)
-                .unwrap_or_else(|_| parse_recursive_help(path_str).unwrap_or_default())
+            match fs::read_to_string(&path) {
+                Ok(content) => content,
+                Err(read_err) => parse_recursive_help(path_str).map_err(|help_err| {
+                    format!(
+                        "Failed to read help text from '{path_str}' ({read_err}) or run it as a command ({help_err})"
+                    )
+                })?,
+            }
         }
     } else {
         parse_recursive_help(tool).map_err(|e| format!("Recursive help failed: {e}"))?
     };
 
-    // 6. Generate schema via LLM
-    let mut dispatcher = LlmDispatcher::new(config);
-    let mut new_schema = dispatcher
-        .generate_schema(tool, &help_content, provider_opt, model_opt)
-        .map_err(|e| format!("LLM generation failed: {e}"))?;
+    // 6. Generate an unverified draft schema from help text.
+    let mut new_schema = generate_schema_from_help(tool, &help_content);
 
     // 7. Determine version and perform diff check
-    let latest_ver = get_latest_version(tool).unwrap_or(None);
+    let latest_ver = get_latest_version_for_config(tool, Some(&config_file_path)).unwrap_or(None);
     let old_schema_str = if let Some(ver) = latest_ver {
-        let mut old_schema = load_schema(tool, ver)?;
+        let mut old_schema = load_schema_for_config(tool, ver, Some(&config_file_path))?;
         new_schema.meta.version = ver + 1;
         old_schema.meta.version = ver + 1;
         serde_json::to_string_pretty(&old_schema).unwrap_or_default()
@@ -147,7 +150,8 @@ pub fn run(
                 return Ok(());
             }
         } else {
-            save_schema(&new_schema).map_err(|e| format!("Failed to save schema: {e}"))?;
+            save_schema_for_config(&new_schema, Some(&config_file_path))
+                .map_err(|e| format!("Failed to save schema: {e}"))?;
             println!(
                 "Schema saved successfully (version {}).",
                 new_schema.meta.version

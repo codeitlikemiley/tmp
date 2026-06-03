@@ -284,73 +284,6 @@ fn is_binary_available(binary: &str) -> bool {
     false
 }
 
-pub fn build_resolve_prompt(query: &str, cwd: &str, schemas: &[Schema]) -> String {
-    let mut schema_text = String::new();
-
-    for schema in schemas {
-        schema_text.push_str(&format!("\nTool: {}\n", schema.meta.tool));
-        for cmd in &schema.commands {
-            schema_text.push_str(&format!("- Command: `{}`\n", cmd.command));
-            if !cmd.description.is_empty() {
-                schema_text.push_str(&format!("  Description: {}\n", cmd.description));
-            }
-
-            for token in &cmd.tokens {
-                let required = if token.required { " (REQUIRED)" } else { "" };
-                let flag_str = match &token.flag {
-                    Some(f) => format!(" flag: {}", f),
-                    None => " (positional)".to_string(),
-                };
-
-                schema_text.push_str(&format!(
-                    "  - Token {}:{}{} — {}\n",
-                    token.name, flag_str, required, token.description
-                ));
-
-                if let Some(ref default) = token.default {
-                    schema_text.push_str(&format!("    [default: {}]\n", default));
-                }
-
-                if let Some(ref values) = token.values {
-                    if !values.is_empty() {
-                        schema_text.push_str(&format!("    valid values: {:?}\n", values));
-                    }
-                }
-            }
-        }
-    }
-
-    format!(
-        r#"You are a CLI command resolver. Given TMP schemas with REAL resolved data source values, pick the BEST matching command and fill its tokens.
-
-Working directory: {}
-
-Available commands with their tokens:
-{}
-
-User query: "{}"
-
-CRITICAL RULES:
-- Pick the SINGLE best matching command from the schemas above
-- Fill tokens using ONLY the valid values shown (if values are listed)
-- For tokens without listed values, use reasonable values from the query
-- If a token is optional and the query doesn't mention it, omit it
-- If the query doesn't match ANY available command, set confidence to "none"
-
-Respond ONLY with valid JSON (no markdown, no backticks):
-{{
-  "command": "the full command with tokens filled",
-  "tool": "the tool group name",
-  "explanation": "brief explanation of what this command does",
-  "confidence": "high" or "medium" or "low" or "none",
-  "tokens_filled": [
-    {{"name": "token_name", "value": "filled_value", "source": "how this value was determined"}}
-  ]
-}}"#,
-        cwd, schema_text, query
-    )
-}
-
 pub fn resolve(
     query: &str,
     context: &Context,
@@ -361,26 +294,6 @@ pub fn resolve(
 
     if let Some(result) = heuristic_resolve(query, &schemas, context, tool_filter) {
         return Ok(result);
-    }
-
-    let config_file_path = match config_path {
-        Some(p) => p.to_path_buf(),
-        None => crate::config::default_config_path()
-            .ok_or_else(|| "Could not determine default config directory".to_string())?,
-    };
-    if let Ok(config) = crate::config::load_config(Some(&config_file_path)) {
-        if !config.llm.providers.is_empty() {
-            let mut dispatcher = crate::llm::LlmDispatcher::new(config);
-            let prompt = build_resolve_prompt(query, &context.cwd, &schemas);
-            if let Ok(raw_response) = dispatcher.query_resolve(&prompt, None, None) {
-                let cleaned = crate::llm::clean_json_markdown(&raw_response);
-                if let Ok(res) = serde_json::from_str::<ResolveResult>(&cleaned) {
-                    if res.confidence != "none" {
-                        return Ok(res);
-                    }
-                }
-            }
-        }
     }
 
     Err(format!(

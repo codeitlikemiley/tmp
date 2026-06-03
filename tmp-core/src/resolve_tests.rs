@@ -213,23 +213,3 @@ fn test_heuristic_resolve_token_filling() {
     assert_eq!(fill2.value, "main");
     assert_eq!(fill2.source, "Default value");
 }
-
-#[test]
-fn test_build_resolve_prompt() {
-    let tokens = vec![Token {
-        name: "target".to_string(),
-        description: "target option".to_string(),
-        required: true,
-        token_type: TokenType::String,
-        default: Some("my_default".to_string()),
-        values: Some(vec!["val1".to_string()]),
-        flag: Some("--target".to_string()),
-        data_source: None,
-    }];
-    let schema = dummy_schema_for_resolve("git", "git checkout", tokens);
-    let prompt = build_resolve_prompt("my query", "/my/cwd", &[schema]);
-    assert!(prompt.contains("git checkout"));
-    assert!(prompt.contains("target"));
-    assert!(prompt.contains("my_default"));
-    assert!(prompt.contains("val1"));
-}

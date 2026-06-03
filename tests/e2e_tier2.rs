@@ -55,9 +55,20 @@ fn test_tier2_f1_malformed_port() {
 }
 
 #[test]
-fn test_tier2_f1_provider_rotation_fallback() {
+fn test_tier2_f1_legacy_provider_config_ignored() {
     let sandbox = TestSandbox::new();
-    // Rotation fallback strategy (already verified in unit tests)
+    sandbox.write_config(
+        r#"[llm]
+strategy = "fallback"
+
+[[llm.providers]]
+provider = "gemini"
+keys = ["legacy-key"]
+"#,
+    );
+
+    let output = sandbox.run(&["schema", "list"]);
+    assert!(output.status.success());
 }
 
 // ==========================================
@@ -696,41 +707,11 @@ echo "  cyclic-tool   Self reference subcommand"
     paths.insert(0, sandbox.temp_dir.path().to_path_buf());
     let new_path = std::env::join_paths(paths).unwrap();
 
-    let schema_json = r#"{
-        "meta": {
-            "tool": "cyclic-tool",
-            "version": 1,
-            "verified": true,
-            "keywords": []
-        },
-        "commands": []
-    }"#;
-
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_json
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
-
     let output = std::process::Command::new(&sandbox.bin_path)
         .args(["generate", "cyclic-tool"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .env("PATH", &new_path)
         .output()
         .expect("Failed to execute generate command");
@@ -747,20 +728,13 @@ echo "  cyclic-tool   Self reference subcommand"
 }
 
 #[test]
-fn test_tier2_f7_llm_malformed_schema() {
+fn test_tier2_f7_generate_missing_help_source_fails() {
     let sandbox = TestSandbox::new();
-    fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
-
-    let server = MockHttpServer::start(move |_| "not a json string".to_string());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
-
     let output = std::process::Command::new(&sandbox.bin_path)
-        .args(["generate", "git", "--help-text", "help.txt"])
+        .args(["generate", "git", "--help-text", "missing-help-source"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
@@ -782,7 +756,7 @@ fn test_tier2_f7_history_empty() {
 }
 
 #[test]
-fn test_tier2_f7_all_keys_fail() {
+fn test_tier2_f7_legacy_provider_config_does_not_make_network_calls() {
     let sandbox = TestSandbox::new();
     fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
 
@@ -814,13 +788,11 @@ model = "gemini-1.5-flash"
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env_remove("GEMINI_API_KEY")
-        .env_remove("GEMINI_BASE_URL")
         .output()
         .expect("Failed to execute generate command");
 
-    assert!(!output.status.success());
-    assert_eq!(request_count.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert!(output.status.success());
+    assert_eq!(request_count.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
 // ==========================================
@@ -943,7 +915,7 @@ fn test_tier2_f8_step_timeout() {
 #[test]
 fn test_adversarial_config_empty_env_variables() {
     let sandbox = TestSandbox::new();
-    // Run registry search with empty env var to verify no panic/crash
+    // Legacy provider env vars should not affect non-AI CLI commands.
     let output = std::process::Command::new(&sandbox.bin_path)
         .args(["registry", "search", "cargo"])
         .env("HOME", &sandbox.home_dir)
@@ -1275,54 +1247,23 @@ fn test_adversarial_run_cargo_subdirectories() {
 fn test_adversarial_generate_identical_no_force() {
     let sandbox = TestSandbox::new();
     sandbox.run(&["init"]);
-
-    let schema_json = r#"{
-        "meta": {
-            "tool": "git",
-            "version": 1,
-            "verified": false,
-            "keywords": []
-        },
-        "commands": []
-    }"#;
-
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_json
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
+    fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
 
     let output_v1 = std::process::Command::new(&sandbox.bin_path)
-        .args(["generate", "git"])
+        .args(["generate", "git", "--help-text", "help.txt"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
     assert!(output_v1.status.success());
 
     let output_v2_no_force = std::process::Command::new(&sandbox.bin_path)
-        .args(["generate", "git"])
+        .args(["generate", "git", "--help-text", "help.txt"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
@@ -1337,12 +1278,10 @@ fn test_adversarial_generate_identical_no_force() {
     assert!(content.contains("\"version\": 1"));
 
     let output_v2_force = std::process::Command::new(&sandbox.bin_path)
-        .args(["generate", "git", "--force"])
+        .args(["generate", "git", "--help-text", "help.txt", "--force"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
@@ -1399,28 +1338,14 @@ fn test_adversarial_generate_flags_combinations() {
     let active_content = fs::read_to_string(schemas_dir.join("git.json")).unwrap();
     assert!(active_content.contains("\"version\": 2"));
 
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_v1
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
+    fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
 
     let output_non_int = std::process::Command::new(&sandbox.bin_path)
         .args([
             "generate",
             "git",
+            "--help-text",
+            "help.txt",
             "--verify",
             "--non-interactive",
             "--force",
@@ -1428,8 +1353,6 @@ fn test_adversarial_generate_flags_combinations() {
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute");
 

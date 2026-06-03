@@ -2,8 +2,8 @@
 pub mod compile;
 pub mod config;
 pub mod context;
+pub mod generate;
 pub mod help;
-pub mod llm;
 pub mod registry;
 pub mod resolve;
 pub mod resolver;

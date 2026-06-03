@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TMP Benchmark Run",
+  "type": "object",
+  "required": [
+    "run_id",
+    "task_id",
+    "mode",
+    "surface",
+    "tool_calls",
+    "input_tokens",
+    "output_tokens",
+    "wall_time_ms",
+    "success",
+    "invalid_operation_attempted",
+    "user_clarifications",
+    "failed_attempts"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string"
+    },
+    "task_id": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["baseline", "tmp_assisted", "tmp_completion", "tmp_registry", "tmp_generated_schema"]
+    },
+    "surface": {
+      "type": "string",
+      "enum": ["cli", "completion", "api", "sql", "workflow", "script", "registry", "failure"]
+    },
+    "agent": {
+      "type": "string"
+    },
+    "model": {
+      "type": "string"
+    },
+    "tool_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "invalid_operation_attempted": {
+      "type": "boolean"
+    },
+    "user_clarifications": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

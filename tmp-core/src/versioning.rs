@@ -1,7 +1,15 @@
 use crate::schema::Schema;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub fn schemas_dir() -> Option<PathBuf> {
+    schemas_dir_for_config(None)
+}
+
+pub fn schemas_dir_for_config(config_path: Option<&Path>) -> Option<PathBuf> {
+    if let Some(config_path) = config_path {
+        return config_path.parent().map(|parent| parent.join("schemas"));
+    }
+
     if let Ok(custom_dir) = std::env::var("TMP_CONFIG_DIR") {
         if !custom_dir.trim().is_empty() {
             let mut p = PathBuf::from(custom_dir);
@@ -18,12 +26,29 @@ pub fn schemas_dir() -> Option<PathBuf> {
 }
 
 pub fn active_schema_path(tool: &str) -> Result<PathBuf, String> {
-    let dir = schemas_dir().ok_or_else(|| "Could not determine schemas directory".to_string())?;
+    active_schema_path_for_config(tool, None)
+}
+
+pub fn active_schema_path_for_config(
+    tool: &str,
+    config_path: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let dir = schemas_dir_for_config(config_path)
+        .ok_or_else(|| "Could not determine schemas directory".to_string())?;
     Ok(dir.join(format!("{}.json", tool)))
 }
 
 pub fn version_schema_path(tool: &str, version: u32) -> Result<PathBuf, String> {
-    let dir = schemas_dir().ok_or_else(|| "Could not determine schemas directory".to_string())?;
+    version_schema_path_for_config(tool, version, None)
+}
+
+pub fn version_schema_path_for_config(
+    tool: &str,
+    version: u32,
+    config_path: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let dir = schemas_dir_for_config(config_path)
+        .ok_or_else(|| "Could not determine schemas directory".to_string())?;
     Ok(dir
         .join("versions")
         .join(tool)
@@ -31,8 +56,13 @@ pub fn version_schema_path(tool: &str, version: u32) -> Result<PathBuf, String> 
 }
 
 pub fn save_schema(schema: &Schema) -> Result<(), String> {
-    let active_path = active_schema_path(&schema.meta.tool)?;
-    let version_path = version_schema_path(&schema.meta.tool, schema.meta.version)?;
+    save_schema_for_config(schema, None)
+}
+
+pub fn save_schema_for_config(schema: &Schema, config_path: Option<&Path>) -> Result<(), String> {
+    let active_path = active_schema_path_for_config(&schema.meta.tool, config_path)?;
+    let version_path =
+        version_schema_path_for_config(&schema.meta.tool, schema.meta.version, config_path)?;
 
     if let Some(parent) = active_path.parent() {
         std::fs::create_dir_all(parent)
@@ -53,7 +83,14 @@ pub fn save_schema(schema: &Schema) -> Result<(), String> {
 }
 
 pub fn get_latest_version(tool: &str) -> Result<Option<u32>, String> {
-    let dir = schemas_dir()
+    get_latest_version_for_config(tool, None)
+}
+
+pub fn get_latest_version_for_config(
+    tool: &str,
+    config_path: Option<&Path>,
+) -> Result<Option<u32>, String> {
+    let dir = schemas_dir_for_config(config_path)
         .ok_or_else(|| "Could not determine schemas directory".to_string())?
         .join("versions")
         .join(tool);
@@ -80,7 +117,15 @@ pub fn get_latest_version(tool: &str) -> Result<Option<u32>, String> {
 }
 
 pub fn load_schema(tool: &str, version: u32) -> Result<Schema, String> {
-    let path = version_schema_path(tool, version)?;
+    load_schema_for_config(tool, version, None)
+}
+
+pub fn load_schema_for_config(
+    tool: &str,
+    version: u32,
+    config_path: Option<&Path>,
+) -> Result<Schema, String> {
+    let path = version_schema_path_for_config(tool, version, config_path)?;
     if !path.exists() {
         return Err(format!("Schema file not found: {:?}", path));
     }
@@ -92,7 +137,14 @@ pub fn load_schema(tool: &str, version: u32) -> Result<Schema, String> {
 }
 
 pub fn get_history(tool: &str) -> Result<Vec<(u32, std::time::SystemTime)>, String> {
-    let dir = schemas_dir()
+    get_history_for_config(tool, None)
+}
+
+pub fn get_history_for_config(
+    tool: &str,
+    config_path: Option<&Path>,
+) -> Result<Vec<(u32, std::time::SystemTime)>, String> {
+    let dir = schemas_dir_for_config(config_path)
         .ok_or_else(|| "Could not determine schemas directory".to_string())?
         .join("versions")
         .join(tool);
@@ -126,11 +178,19 @@ pub fn get_history(tool: &str) -> Result<Vec<(u32, std::time::SystemTime)>, Stri
 }
 
 pub fn rollback(tool: &str, target_version: u32) -> Result<(), String> {
-    let mut schema = load_schema(tool, target_version)?;
-    let latest =
-        get_latest_version(tool)?.ok_or_else(|| "No schema version history found".to_string())?;
+    rollback_for_config(tool, target_version, None)
+}
+
+pub fn rollback_for_config(
+    tool: &str,
+    target_version: u32,
+    config_path: Option<&Path>,
+) -> Result<(), String> {
+    let mut schema = load_schema_for_config(tool, target_version, config_path)?;
+    let latest = get_latest_version_for_config(tool, config_path)?
+        .ok_or_else(|| "No schema version history found".to_string())?;
     schema.meta.version = latest + 1;
-    save_schema(&schema)?;
+    save_schema_for_config(&schema, config_path)?;
     Ok(())
 }
 

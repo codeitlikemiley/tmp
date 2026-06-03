@@ -1,7 +1,7 @@
 #![allow(dead_code, unused)]
 // E2E Test - Tier 1: Feature Coverage (5 tests per feature)
 mod common;
-use common::{MockHttpServer, TestSandbox};
+use common::TestSandbox;
 use std::fs;
 use std::process::Command;
 
@@ -32,7 +32,7 @@ fn test_tier1_f1_config_env_vars() {
     let sandbox = TestSandbox::new();
     let output = sandbox.run(&["init"]);
     assert!(output.status.success());
-    // Verification of environment loading logic is in unit tests
+    // Provider environment variables are intentionally ignored by config loading.
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn test_tier1_f1_config_precedence() {
     let sandbox = TestSandbox::new();
     let output = sandbox.run(&["init"]);
     assert!(output.status.success());
-    // Precedence tests check config overrides in environment (already validated in unit tests)
+    // The config currently only owns local TMP paths and schema storage.
 }
 
 // ==========================================
@@ -587,43 +587,17 @@ fn test_tier1_f6_resolve_mismatch_error() {
 #[test]
 fn test_tier1_f7_generate_help() {
     let sandbox = TestSandbox::new();
-    fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
-
-    let schema_json = r#"{
-        "meta": {
-            "tool": "git",
-            "version": 1,
-            "verified": true,
-            "keywords": []
-        },
-        "commands": []
-    }"#;
-
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_json
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
+    fs::write(
+        sandbox.project_dir.join("help.txt"),
+        "Usage: git <COMMAND>\n\nCommands:\n  clone    Clone a repository\n",
+    )
+    .unwrap();
 
     let output = Command::new(&sandbox.bin_path)
         .args(["generate", "git", "--help-text", "help.txt"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
@@ -638,6 +612,8 @@ fn test_tier1_f7_generate_help() {
     assert!(active_path.exists());
     let content = fs::read_to_string(active_path).unwrap();
     assert!(content.contains("\"tool\": \"git\""));
+    assert!(content.contains("\"verified\": false"));
+    assert!(content.contains("\"command\": \"git clone\""));
 }
 
 #[test]
@@ -645,41 +621,11 @@ fn test_tier1_f7_generate_verify_tui_args() {
     let sandbox = TestSandbox::new();
     fs::write(sandbox.project_dir.join("help.txt"), "usage: git clone").unwrap();
 
-    let schema_json = r#"{
-        "meta": {
-            "tool": "git",
-            "version": 1,
-            "verified": true,
-            "keywords": []
-        },
-        "commands": []
-    }"#;
-
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_json
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
-
     let output = Command::new(&sandbox.bin_path)
         .args(["generate", "git", "--help-text", "help.txt", "--verify"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 
@@ -715,41 +661,11 @@ fn test_tier1_f7_generate_force_backup() {
     fs::write(schemas_dir.join("git.json"), schema_v1).unwrap();
     fs::write(versions_dir.join("v1.json"), schema_v1).unwrap();
 
-    let schema_v2 = r#"{
-        "meta": {
-            "tool": "git",
-            "version": 2,
-            "verified": true,
-            "keywords": ["v2"]
-        },
-        "commands": []
-    }"#;
-
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": schema_v2
-                        }
-                    ]
-                }
-            }
-        ]
-    })
-    .to_string();
-
-    let server = MockHttpServer::start(move |_| response_body.clone());
-    let base_url = format!("http://127.0.0.1:{}", server.port);
-
     let output = Command::new(&sandbox.bin_path)
         .args(["generate", "git", "--help-text", "help.txt", "--force"])
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env("GEMINI_BASE_URL", &base_url)
         .output()
         .expect("Failed to execute generate command");
 

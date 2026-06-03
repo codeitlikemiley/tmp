@@ -148,22 +148,6 @@ echo "  run     Run the custom tool"
         std::fs::set_permissions(&script_path, perms).unwrap();
     }
 
-    let response_body = serde_json::json!({
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": "{\n  \"meta\": {\n    \"tool\": \"custom-tool\",\n    \"version\": 1,\n    \"verified\": true,\n    \"keywords\": []\n  },\n  \"commands\": []\n}"
-                        }
-                    ]
-                }
-            }
-        ]
-    }).to_string();
-
-    let server = common::MockHttpServer::start(move |_req| response_body.clone());
-
     let current_path = std::env::var("PATH").unwrap_or_default();
     let new_path = format!("{}:{}", temp_bin_dir.path().display(), current_path);
 
@@ -172,11 +156,6 @@ echo "  run     Run the custom tool"
         .current_dir(&sandbox.project_dir)
         .env("HOME", &sandbox.home_dir)
         .env("TMP_CONFIG_DIR", &sandbox.config_dir)
-        .env("GEMINI_API_KEY", "mock_key")
-        .env(
-            "GEMINI_BASE_URL",
-            format!("http://127.0.0.1:{}", server.port),
-        )
         .env("PATH", new_path)
         .output()
         .expect("Failed to execute generate command");

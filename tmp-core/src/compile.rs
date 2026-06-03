@@ -105,7 +105,7 @@ impl Compiler {
 
     pub fn generate_markdown(output: &CompileOutput) -> String {
         let mut md = String::new();
-        md.push_str("# Terminal Meta Protocol (TMP) - Project Context\n\n");
+        md.push_str("# Tool Mapping Protocol (TMP) - Project Context\n\n");
 
         md.push_str("## Project Information\n");
         md.push_str(&format!(
@@ -195,9 +195,9 @@ impl Compiler {
             }
         }
 
-        md.push_str("\n## AI Agent Instructions\n");
-        md.push_str("1. Use `tmp resolve \"<intent>\"` to ground your natural language request into a shell command.\n");
-        md.push_str("2. Run `tmp run <command>` (or `tmp run` directly in file context) to execute the grounded commands safely.\n");
+        md.push_str("\n## External Agent Instructions\n");
+        md.push_str("1. Use `tmp resolve \"<intent>\"` to ground a natural-language request into a schema-backed shell command.\n");
+        md.push_str("2. Run `tmp run` after a successful resolve, or `tmp run <file>` when executing a file contextually.\n");
         md.push_str("3. Keep token context size small by reading `.tmp/context.md` instead of full tool manuals.\n");
         md.push_str(
             "4. If you need to refresh context, run `tmp compile` or check watch outputs.\n",

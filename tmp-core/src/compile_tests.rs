@@ -149,7 +149,7 @@ fn test_compile_and_write_to_disk() {
     fs::create_dir_all(&config_dir).unwrap();
 
     let config_path = config_dir.join("config.toml");
-    fs::write(&config_path, "[llm]").unwrap();
+    fs::write(&config_path, "# TMP config\n").unwrap();
 
     let schemas_dir = config_dir.join("schemas");
     fs::create_dir_all(&schemas_dir).unwrap();

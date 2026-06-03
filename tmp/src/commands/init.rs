@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tmp_core::config::default_config_path;
 
 pub fn run(custom_config_path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Initializing Terminal Meta Protocol (tmp)...");
+    println!("Initializing Tool Mapping Protocol (tmp)...");
 
     let config_file_path = match custom_config_path {
         Some(p) => PathBuf::from(p),
@@ -28,17 +28,8 @@ pub fn run(custom_config_path: Option<&str>) -> Result<(), Box<dyn std::error::E
 
     // Write default config if it doesn't exist
     if !config_file_path.exists() {
-        let default_config_content = r#"[llm]
-strategy = "fallback"
-
-[[llm.providers]]
-provider = "gemini"
-keys = []
-
-[[llm.providers]]
-provider = "openai"
-keys = []
-"#;
+        let default_config_content =
+            "# TMP configuration\n# Schemas are stored in the sibling `schemas/` directory.\n";
         fs::write(&config_file_path, default_config_content)?;
         println!(
             "Created default configuration file at: {}",
