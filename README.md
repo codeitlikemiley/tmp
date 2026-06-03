@@ -21,9 +21,9 @@
 
 ## Documentation Guides
 
-Please refer to the following step-by-step guides under the [`docs/`](file:///Volumes/goldcoders/tmp/docs/) directory:
+Please refer to the following step-by-step guides under the [docs/](docs/) directory:
 
-1. 🚀 **[Getting Started](file:///Volumes/goldcoders/tmp/docs/getting_started.md)**: Installing the CLI, setting up `config.toml`, compiling project contexts, and resolving queries.
-2. 📦 **[Library Usage](file:///Volumes/goldcoders/tmp/docs/library_usage.md)**: Importing the `tmp-core` crate as a dependency in other Rust applications and utilizing public APIs.
-3. 📋 **[Schema Specifications](file:///Volumes/goldcoders/tmp/docs/specifications.md)**: Detailed formats for schema files, built-in resolvers, whitelists, and versioning.
-4. ⚙️ **[Workflows & Agent Integrations](file:///Volumes/goldcoders/tmp/docs/workflows.md)**: Parameterized multi-step workflows, registry searching, and AI agent bridge setup (`tmp init-agent`).
+1. 🚀 **[Getting Started](docs/getting_started.md)**: Installing the CLI, setting up `config.toml`, compiling project contexts, and resolving queries.
+2. 📦 **[Library Usage](docs/library_usage.md)**: Importing the `tmp-core` crate as a dependency in other Rust applications and utilizing public APIs.
+3. 📋 **[Schema Specifications](docs/specifications.md)**: Detailed formats for schema files, built-in resolvers, whitelists, and versioning.
+4. ⚙️ **[Workflows & Agent Integrations](docs/workflows.md)**: Parameterized multi-step workflows, registry searching, and AI agent bridge setup (`tmp init-agent`).
