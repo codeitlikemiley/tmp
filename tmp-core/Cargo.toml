@@ -1,0 +1,16 @@
+[package]
+name = "tmp-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+ureq = { version = "2.9", features = ["json"] }
+dirs = "5.0"
+command = { path = "../crates/command" }
+
+[dev-dependencies]
+tempfile = "3.8"
+
