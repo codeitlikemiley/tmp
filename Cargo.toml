@@ -4,5 +4,6 @@ members = [
     "tmp-core",
     "tmp",
     "crates/command",
-    "crates/tmp-agent",
 ]
+# crates/tmp-agent needs a sibling antigravity-sdk-rust checkout and is
+# built separately. Cargo still fails workspace load if it stays in members.
