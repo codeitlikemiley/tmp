@@ -1,9 +1,102 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Surface {
+    Cli,
+    Api,
+    Sql,
+    Workflow,
+    Script,
+    Completion,
+    Agent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Effect {
+    #[serde(rename = "read-only")]
+    ReadOnly,
+    #[serde(rename = "build-test")]
+    BuildTest,
+    #[serde(rename = "network")]
+    Network,
+    #[serde(rename = "deployment")]
+    Deployment,
+    #[serde(rename = "destructive")]
+    Destructive,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Risk {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Approval {
+    NotRequired,
+    Recommended,
+    Required,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceType {
+    ParsedHelp,
+    DryRun,
+    HumanReview,
+    RegistrySignature,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputMode {
+    Raw,
+    TestSummary,
+    DiffSummary,
+    GitSummary,
+    LogSummary,
+    SearchSummary,
+    JsonProjection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutputPolicyConfig {
+    pub mode: OutputMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_retention: Option<String>,
+}
+
+fn default_surface() -> Surface {
+    Surface::Cli
+}
+
+fn default_effect() -> Effect {
+    Effect::BuildTest
+}
+
+fn default_risk() -> Risk {
+    Risk::Low
+}
+
+fn default_approval() -> Approval {
+    Approval::NotRequired
+}
+
+fn default_output_policy() -> OutputPolicyConfig {
+    OutputPolicyConfig {
+        mode: OutputMode::Raw,
+        raw_retention: None,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Schema {
     pub meta: SchemaMeta,
-    pub commands: Vec<Command>,
+    pub operations: Vec<Operation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,23 +128,38 @@ pub struct SchemaMeta {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Command {
+pub struct Operation {
     pub command: String,
     pub description: String,
     pub group: String,
     #[serde(default)]
     pub verified: bool,
-    pub tokens: Vec<Token>,
+
+    #[serde(alias = "tokens")]
+    pub parameters: Vec<Parameter>,
+
+    #[serde(default = "default_surface")]
+    pub surface: Surface,
+    #[serde(default = "default_effect")]
+    pub effect: Effect,
+    #[serde(default = "default_risk")]
+    pub risk: Risk,
+    #[serde(default = "default_approval")]
+    pub approval: Approval,
+    #[serde(default)]
+    pub evidence: Vec<EvidenceType>,
+    #[serde(default = "default_output_policy")]
+    pub output_policy: OutputPolicyConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Token {
+pub struct Parameter {
     pub name: String,
     pub description: String,
     #[serde(default)]
     pub required: bool,
     #[serde(rename = "type")]
-    pub token_type: TokenType,
+    pub parameter_type: ParameterType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -63,7 +171,7 @@ pub struct Token {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TokenType {
+pub enum ParameterType {
     String,
     Boolean,
     Enum,
@@ -96,10 +204,10 @@ impl Schema {
 
     pub fn export_shareable(&self) -> Self {
         let mut cloned = self.clone();
-        for cmd in &mut cloned.commands {
-            for token in &mut cmd.tokens {
-                if token.data_source.is_some() {
-                    token.values = None;
+        for op in &mut cloned.operations {
+            for param in &mut op.parameters {
+                if param.data_source.is_some() {
+                    param.values = None;
                 }
             }
         }
@@ -122,28 +230,28 @@ impl Schema {
             );
         }
 
-        for cmd in &self.commands {
-            if cmd.command.trim().is_empty() {
+        for op in &self.operations {
+            if op.command.trim().is_empty() {
                 return Err("command cannot be empty".to_string());
             }
-            for token in &cmd.tokens {
-                if token.name.is_empty() {
+            for param in &op.parameters {
+                if param.name.is_empty() {
                     return Err("token name cannot be empty".to_string());
                 }
-                if token.name.chars().any(|c| c.is_whitespace()) {
+                if param.name.chars().any(|c| c.is_whitespace()) {
                     return Err("token name cannot contain whitespace".to_string());
                 }
-                if !token
+                if !param
                     .name
                     .chars()
                     .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
                 {
                     return Err(format!(
                         "token name '{}' contains invalid characters",
-                        token.name
+                        param.name
                     ));
                 }
-                if let Some(ref ds) = token.data_source {
+                if let Some(ref ds) = param.data_source {
                     if let Some(ref c) = ds.command {
                         if c.trim().is_empty() {
                             return Err("data source command cannot be empty".to_string());
@@ -170,6 +278,29 @@ impl Schema {
         }
         Ok(())
     }
+
+    /// Strict validation that checks for inconsistencies between risk, effect, and approval.
+    ///
+    /// Returns a list of warnings for operations with questionable metadata combinations.
+    pub fn validate_strict(&self) -> Result<Vec<String>, String> {
+        self.validate()?;
+        let mut warnings = Vec::new();
+        for op in &self.operations {
+            if op.risk == Risk::High && op.approval == Approval::NotRequired {
+                warnings.push(format!(
+                    "operation '{}': high-risk operations should require approval",
+                    op.command
+                ));
+            }
+            if op.effect == Effect::Destructive && op.risk == Risk::Low {
+                warnings.push(format!(
+                    "operation '{}': destructive effects should not have low risk",
+                    op.command
+                ));
+            }
+        }
+        Ok(warnings)
+    }
 }
 
 impl<'de> Deserialize<'de> for Schema {
@@ -180,14 +311,15 @@ impl<'de> Deserialize<'de> for Schema {
         #[derive(Deserialize)]
         struct SchemaHelper {
             meta: SchemaMeta,
-            commands: Vec<Command>,
+            #[serde(alias = "commands")]
+            operations: Vec<Operation>,
         }
 
         let helper = SchemaHelper::deserialize(deserializer)?;
 
         let schema = Schema {
             meta: helper.meta,
-            commands: helper.commands,
+            operations: helper.operations,
         };
 
         schema.validate().map_err(serde::de::Error::custom)?;

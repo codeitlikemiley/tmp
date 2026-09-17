@@ -13,12 +13,13 @@ use ratatui::{
 use std::io::{stdout, IsTerminal};
 use tmp_core::context::Context;
 use tmp_core::resolver::DataResolver;
-use tmp_core::schema::{DataSource, Schema, TokenType};
+use tmp_core::schema::{DataSource, ParameterType, Schema};
+use tmp_core::traits::Resolver;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum Focus {
-    Commands,
-    Tokens,
+    Operations,
+    Parameters,
 }
 
 #[derive(Clone)]
@@ -50,8 +51,8 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
     let mut terminal = Terminal::new(backend)?;
 
     let mut selected_cmd_idx = 0;
-    let mut selected_tok_idx = 0;
-    let mut focus = Focus::Commands;
+    let mut selected_param_idx = 0;
+    let mut focus = Focus::Operations;
     let mut edit_mode = EditMode::Normal;
     let mut test_result: Option<Result<Vec<String>, String>> = None;
 
@@ -61,7 +62,7 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                 f,
                 schema,
                 selected_cmd_idx,
-                selected_tok_idx,
+                selected_param_idx,
                 focus,
                 &edit_mode,
                 &test_result,
@@ -98,62 +99,58 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                             }
                             KeyCode::Tab | KeyCode::Left | KeyCode::Right => {
                                 focus = match focus {
-                                    Focus::Commands => Focus::Tokens,
-                                    Focus::Tokens => Focus::Commands,
+                                    Focus::Operations => Focus::Parameters,
+                                    Focus::Parameters => Focus::Operations,
                                 };
                             }
                             KeyCode::Up => match focus {
-                                Focus::Commands => {
+                                Focus::Operations => {
                                     if selected_cmd_idx > 0 {
                                         selected_cmd_idx -= 1;
-                                        selected_tok_idx = 0;
+                                        selected_param_idx = 0;
                                         test_result = None;
                                     }
                                 }
-                                Focus::Tokens => {
-                                    if selected_tok_idx > 0 {
-                                        selected_tok_idx -= 1;
+                                Focus::Parameters => {
+                                    if selected_param_idx > 0 {
+                                        selected_param_idx -= 1;
                                         test_result = None;
                                     }
                                 }
                             },
                             KeyCode::Down => match focus {
-                                Focus::Commands => {
-                                    if !schema.commands.is_empty()
-                                        && selected_cmd_idx + 1 < schema.commands.len()
+                                Focus::Operations => {
+                                    if !schema.operations.is_empty()
+                                        && selected_cmd_idx + 1 < schema.operations.len()
                                     {
                                         selected_cmd_idx += 1;
-                                        selected_tok_idx = 0;
+                                        selected_param_idx = 0;
                                         test_result = None;
                                     }
                                 }
-                                Focus::Tokens => {
-                                    if let Some(cmd) = schema.commands.get(selected_cmd_idx) {
-                                        if selected_tok_idx + 1 < cmd.tokens.len() {
-                                            selected_tok_idx += 1;
+                                Focus::Parameters => {
+                                    if let Some(op) = schema.operations.get(selected_cmd_idx) {
+                                        if selected_param_idx + 1 < op.parameters.len() {
+                                            selected_param_idx += 1;
                                             test_result = None;
                                         }
                                     }
                                 }
                             },
                             KeyCode::Char('v') => {
-                                if let Some(cmd) = schema.commands.get_mut(selected_cmd_idx) {
-                                    cmd.verified = !cmd.verified;
+                                if let Some(op) = schema.operations.get_mut(selected_cmd_idx) {
+                                    op.verified = !op.verified;
                                 }
                             }
                             KeyCode::Char('V') => {
                                 schema.meta.verified = !schema.meta.verified;
                             }
                             KeyCode::Char('t') => {
-                                if let Some(cmd) = schema.commands.get(selected_cmd_idx) {
-                                    if let Some(token) = cmd.tokens.get(selected_tok_idx) {
-                                        if let Some(ref ds) = token.data_source {
-                                            let res = DataResolver::resolve(ds, context);
-                                            test_result = Some(res);
-                                        } else {
-                                            test_result =
-                                                Some(Err("No data source configured".to_string()));
-                                        }
+                                if let Some(op) = schema.operations.get(selected_cmd_idx) {
+                                    if let Some(param) = op.parameters.get(selected_param_idx) {
+                                        let resolver = DataResolver;
+                                        let res = resolver.values(param, context);
+                                        test_result = Some(res);
                                     }
                                 }
                             }
@@ -166,10 +163,10 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                     EditMode::PromptField => match key.code {
                         KeyCode::Char('c') => {
                             let current_val = schema
-                                .commands
+                                .operations
                                 .get(selected_cmd_idx)
-                                .and_then(|c| c.tokens.get(selected_tok_idx))
-                                .and_then(|t| t.data_source.as_ref())
+                                .and_then(|op| op.parameters.get(selected_param_idx))
+                                .and_then(|p| p.data_source.as_ref())
                                 .and_then(|ds| ds.command.as_ref())
                                 .cloned()
                                 .unwrap_or_default();
@@ -180,10 +177,10 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                         }
                         KeyCode::Char('r') => {
                             let current_val = schema
-                                .commands
+                                .operations
                                 .get(selected_cmd_idx)
-                                .and_then(|c| c.tokens.get(selected_tok_idx))
-                                .and_then(|t| t.data_source.as_ref())
+                                .and_then(|op| op.parameters.get(selected_param_idx))
+                                .and_then(|p| p.data_source.as_ref())
                                 .and_then(|ds| ds.resolver.as_ref())
                                 .cloned()
                                 .unwrap_or_default();
@@ -194,10 +191,10 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                         }
                         KeyCode::Char('p') => {
                             let current_val = schema
-                                .commands
+                                .operations
                                 .get(selected_cmd_idx)
-                                .and_then(|c| c.tokens.get(selected_tok_idx))
-                                .and_then(|t| t.data_source.as_ref())
+                                .and_then(|op| op.parameters.get(selected_param_idx))
+                                .and_then(|p| p.data_source.as_ref())
                                 .map(|ds| ds.parse.clone())
                                 .unwrap_or_else(|| "lines".to_string());
                             edit_mode = EditMode::Editing {
@@ -223,10 +220,10 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                         KeyCode::Enter => {
                             let field = *field;
                             let val = input.clone();
-                            if let Some(cmd) = schema.commands.get_mut(selected_cmd_idx) {
-                                if let Some(token) = cmd.tokens.get_mut(selected_tok_idx) {
+                            if let Some(op) = schema.operations.get_mut(selected_cmd_idx) {
+                                if let Some(param) = op.parameters.get_mut(selected_param_idx) {
                                     let mut ds =
-                                        token.data_source.clone().unwrap_or_else(|| DataSource {
+                                        param.data_source.clone().unwrap_or_else(|| DataSource {
                                             command: None,
                                             resolver: None,
                                             parse: "lines".to_string(),
@@ -255,9 +252,9 @@ pub fn run(schema: &mut Schema, context: &Context) -> Result<bool, Box<dyn std::
                                         }
                                     }
                                     if ds.command.is_none() && ds.resolver.is_none() {
-                                        token.data_source = None;
+                                        param.data_source = None;
                                     } else {
-                                        token.data_source = Some(ds);
+                                        param.data_source = Some(ds);
                                     }
                                 }
                             }
@@ -302,7 +299,7 @@ fn draw_ui(
     f: &mut Frame,
     schema: &Schema,
     selected_cmd_idx: usize,
-    selected_tok_idx: usize,
+    selected_param_idx: usize,
     focus: Focus,
     edit_mode: &EditMode,
     test_result: &Option<Result<Vec<String>, String>>,
@@ -318,11 +315,11 @@ fn draw_ui(
     // Left pane block
     let left_block = Block::default()
         .title(format!(
-            " Commands (Meta Schema Verified: {}) ",
+            " Operations (Meta Schema Verified: {}) ",
             schema.meta.verified
         ))
         .borders(Borders::ALL)
-        .border_style(if focus == Focus::Commands {
+        .border_style(if focus == Focus::Operations {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default().fg(Color::White)
@@ -338,41 +335,41 @@ fn draw_ui(
         ])
         .split(main_chunks[1]);
 
-    // Command Info block
+    // Operation Info block
     let cmd_info_block = Block::default()
-        .title(" Selected Command Info ")
+        .title(" Selected Operation Info ")
         .borders(Borders::ALL);
 
-    // Tokens List block
+    // Parameters List block
     let tokens_block = Block::default()
-        .title(" Tokens ")
+        .title(" Parameters ")
         .borders(Borders::ALL)
-        .border_style(if focus == Focus::Tokens {
+        .border_style(if focus == Focus::Parameters {
             Style::default().fg(Color::Yellow)
         } else {
             Style::default().fg(Color::White)
         });
 
-    // Token Details block
+    // Parameter Details block
     let token_details_block = Block::default()
-        .title(" Selected Token Details ")
+        .title(" Selected Parameter Details ")
         .borders(Borders::ALL);
 
-    // RENDER LEFT COMMANDS LIST
+    // RENDER LEFT OPERATIONS LIST
     let commands_items: Vec<ListItem> = schema
-        .commands
+        .operations
         .iter()
         .enumerate()
-        .map(|(i, cmd)| {
-            let prefix = if cmd.verified { "[✔] " } else { "[ ] " };
-            let style = if i == selected_cmd_idx && focus == Focus::Commands {
+        .map(|(i, op)| {
+            let prefix = if op.verified { "[✔] " } else { "[ ] " };
+            let style = if i == selected_cmd_idx && focus == Focus::Operations {
                 Style::default().bg(Color::Blue).fg(Color::White)
             } else if i == selected_cmd_idx {
                 Style::default().bg(Color::DarkGray)
             } else {
                 Style::default()
             };
-            ListItem::new(format!("{}{}", prefix, cmd.command)).style(style)
+            ListItem::new(format!("{}{}", prefix, op.command)).style(style)
         })
         .collect();
 
@@ -380,46 +377,46 @@ fn draw_ui(
     f.render_widget(commands_list, main_chunks[0]);
 
     // RENDER RIGHT PANE
-    if let Some(cmd) = schema.commands.get(selected_cmd_idx) {
-        // Render Command Info
+    if let Some(op) = schema.operations.get(selected_cmd_idx) {
+        // Render Operation Info
         let cmd_info_text = format!(
             "Command: {}\nGroup: {}\nVerified: {}\nDescription: {}",
-            cmd.command, cmd.group, cmd.verified, cmd.description
+            op.command, op.group, op.verified, op.description
         );
         let cmd_info_paragraph = Paragraph::new(cmd_info_text).block(cmd_info_block);
         f.render_widget(cmd_info_paragraph, right_chunks[0]);
 
-        // Render Tokens List
-        let tokens_items: Vec<ListItem> = cmd
-            .tokens
+        // Render Parameters List
+        let tokens_items: Vec<ListItem> = op
+            .parameters
             .iter()
             .enumerate()
-            .map(|(i, tok)| {
-                let req_star = if tok.required { "*" } else { "" };
-                let type_str = match tok.token_type {
-                    TokenType::String => "String",
-                    TokenType::Boolean => "Boolean",
-                    TokenType::Enum => "Enum",
-                    TokenType::File => "File",
-                    TokenType::Number => "Number",
+            .map(|(i, param)| {
+                let req_star = if param.required { "*" } else { "" };
+                let type_str = match param.parameter_type {
+                    ParameterType::String => "String",
+                    ParameterType::Boolean => "Boolean",
+                    ParameterType::Enum => "Enum",
+                    ParameterType::File => "File",
+                    ParameterType::Number => "Number",
                 };
-                let style = if i == selected_tok_idx && focus == Focus::Tokens {
+                let style = if i == selected_param_idx && focus == Focus::Parameters {
                     Style::default().bg(Color::Blue).fg(Color::White)
-                } else if i == selected_tok_idx {
+                } else if i == selected_param_idx {
                     Style::default().bg(Color::DarkGray)
                 } else {
                     Style::default()
                 };
-                ListItem::new(format!("{}{}: {}", tok.name, req_star, type_str)).style(style)
+                ListItem::new(format!("{}{}: {}", param.name, req_star, type_str)).style(style)
             })
             .collect();
         let tokens_list = List::new(tokens_items).block(tokens_block);
         f.render_widget(tokens_list, right_chunks[1]);
 
-        // Render Selected Token Details
-        if let Some(tok) = cmd.tokens.get(selected_tok_idx) {
+        // Render Selected Parameter Details
+        if let Some(param) = op.parameters.get(selected_param_idx) {
             let mut ds_str = "None".to_string();
-            if let Some(ref ds) = tok.data_source {
+            if let Some(ref ds) = param.data_source {
                 let cmd_part = ds
                     .command
                     .as_ref()
@@ -433,9 +430,9 @@ fn draw_ui(
                 ds_str = format!("{} | {} | Parse: {}", cmd_part, res_part, ds.parse);
             }
 
-            let default_str = tok.default.as_deref().unwrap_or("None");
-            let flag_str = tok.flag.as_deref().unwrap_or("None");
-            let values_str = tok
+            let default_str = param.default.as_deref().unwrap_or("None");
+            let flag_str = param.flag.as_deref().unwrap_or("None");
+            let values_str = param
                 .values
                 .as_ref()
                 .map(|v| format!("{:?}", v))
@@ -455,19 +452,19 @@ fn draw_ui(
 
             let tok_details_text = format!(
                 "Name: {}\nDescription: {}\nDefault: {}\nFlag: {}\nAllowed values: {}\nData Source: {}{}",
-                tok.name, tok.description, default_str, flag_str, values_str, ds_str, test_str
+                param.name, param.description, default_str, flag_str, values_str, ds_str, test_str
             );
             let tok_details_paragraph = Paragraph::new(tok_details_text).block(token_details_block);
             f.render_widget(tok_details_paragraph, right_chunks[2]);
         } else {
-            let empty_p =
-                Paragraph::new("No tokens found for this command.").block(token_details_block);
+            let empty_p = Paragraph::new("No parameters found for this operation.")
+                .block(token_details_block);
             f.render_widget(empty_p, right_chunks[2]);
         }
     } else {
         // Render placeholders
-        let empty_info = Paragraph::new("No command selected.").block(cmd_info_block);
-        let empty_tokens = Paragraph::new("No tokens selected.").block(tokens_block);
+        let empty_info = Paragraph::new("No operation selected.").block(cmd_info_block);
+        let empty_tokens = Paragraph::new("No parameters selected.").block(tokens_block);
         let empty_details = Paragraph::new("No details.").block(token_details_block);
         f.render_widget(empty_info, right_chunks[0]);
         f.render_widget(empty_tokens, right_chunks[1]);
@@ -479,7 +476,7 @@ fn draw_ui(
         EditMode::Normal => {}
         EditMode::PromptField => {
             let block = Block::default()
-                .title(" Edit Token Data Source ")
+                .title(" Edit Parameter Data Source ")
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green));
             let text = "Select data source field to edit:\n\n [c] Command\n [r] Resolver\n [p] Parse mode\n\nPress Esc to cancel";

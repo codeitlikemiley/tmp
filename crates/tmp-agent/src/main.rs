@@ -281,7 +281,9 @@ async fn main() -> Result<(), anyhow::Error> {
     if run_workflow {
         // 8. Generate and run workflow.py
         let python_code = if let Some(ref started_agent) = agent {
-            tracing::info!("Generating python orchestration script workflow.py using Gemini API...");
+            tracing::info!(
+                "Generating python orchestration script workflow.py using Gemini API..."
+            );
 
             let planning_prompt = r#"
 You are a Python script generator. Generate a python3 script named 'workflow.py'.
@@ -313,9 +315,7 @@ Output the python code enclosed in a ```python ... ``` block.
 "#;
 
             match started_agent.chat(planning_prompt).await {
-                Ok(resp) => {
-                    extract_python_code(&resp.text)
-                }
+                Ok(resp) => extract_python_code(&resp.text),
                 Err(e) => {
                     tracing::error!("Failed to generate workflow.py via agent: {}", e);
                     let _ = shutdown_tx.send(());
@@ -365,7 +365,9 @@ Output the python code enclosed in a ```python ... ``` block.
         let _ = server_task.await;
 
         if status.success() {
-            tracing::info!("Workflow completed successfully. Starting schema validation and compilation...");
+            tracing::info!(
+                "Workflow completed successfully. Starting schema validation and compilation..."
+            );
 
             let db_path_str = std::env::var("TMP_DB_PATH")?;
             let db_path = std::path::Path::new(&db_path_str);
@@ -401,7 +403,10 @@ Output the python code enclosed in a ```python ... ``` block.
             tracing::info!("Schema validation and compilation completed successfully. Exiting.");
             std::process::exit(0);
         } else {
-            tracing::error!("Workflow execution failed with exit code: {:?}", status.code());
+            tracing::error!(
+                "Workflow execution failed with exit code: {:?}",
+                status.code()
+            );
             std::process::exit(status.code().unwrap_or(1));
         }
     } else {

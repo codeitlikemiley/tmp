@@ -3,8 +3,33 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
-pub struct Config {}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Config {
+    #[serde(default = "default_registry_repo")]
+    pub registry_repo: String,
+    #[serde(default = "default_output_mode")]
+    pub output_mode: String,
+    #[serde(default)]
+    pub raw_retention: Option<String>,
+}
+
+fn default_registry_repo() -> String {
+    "codeitlikemiley/tmp-registry".to_string()
+}
+
+fn default_output_mode() -> String {
+    "raw".to_string()
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            registry_repo: default_registry_repo(),
+            output_mode: default_output_mode(),
+            raw_retention: None,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum ConfigError {

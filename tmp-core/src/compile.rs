@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::resolver::DataResolver;
-use crate::schema::{Schema, TokenType};
+use crate::schema::{ParameterType, Schema};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -8,25 +8,27 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompileOutput {
     pub context: Context,
-    pub commands: Vec<ResolvedCommand>,
+    #[serde(alias = "commands")]
+    pub operations: Vec<ResolvedOperation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedCommand {
+pub struct ResolvedOperation {
     pub command: String,
     pub description: String,
     pub group: String,
     pub verified: bool,
-    pub tokens: Vec<ResolvedToken>,
+    #[serde(alias = "tokens")]
+    pub parameters: Vec<ResolvedParameter>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResolvedToken {
+pub struct ResolvedParameter {
     pub name: String,
     pub description: String,
     pub required: bool,
     #[serde(rename = "type")]
-    pub token_type: TokenType,
+    pub parameter_type: ParameterType,
     pub default: Option<String>,
     pub flag: Option<String>,
     pub values: Vec<String>,
@@ -50,7 +52,7 @@ impl Compiler {
             .ok_or_else(|| "Invalid configuration path".to_string())?;
         let schemas_dir = config_dir.join("schemas");
 
-        let mut resolved_commands = Vec::new();
+        let mut resolved_operations = Vec::new();
 
         if schemas_dir.exists() {
             for entry in fs::read_dir(schemas_dir).map_err(|e| e.to_string())? {
@@ -60,35 +62,35 @@ impl Compiler {
                     let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
                     if let Ok(schema) = Schema::from_json(&content) {
                         if Self::is_schema_relevant(&schema, context) {
-                            for cmd in schema.commands {
-                                let mut resolved_tokens = Vec::new();
-                                for token in cmd.tokens {
-                                    let resolved_values = match &token.data_source {
+                            for op in schema.operations {
+                                let mut resolved_parameters = Vec::new();
+                                for param in op.parameters {
+                                    let resolved_values = match &param.data_source {
                                         Some(ds) => match DataResolver::resolve(ds, context) {
                                             Ok(vals) => vals,
                                             Err(err) => {
-                                                eprintln!("Warning: Failed to resolve token data for '{}': {}", token.name, err);
+                                                eprintln!("Warning: Failed to resolve token data for '{}': {}", param.name, err);
                                                 Vec::new()
                                             }
                                         },
-                                        None => token.values.clone().unwrap_or_default(),
+                                        None => param.values.clone().unwrap_or_default(),
                                     };
-                                    resolved_tokens.push(ResolvedToken {
-                                        name: token.name,
-                                        description: token.description,
-                                        required: token.required,
-                                        token_type: token.token_type,
-                                        default: token.default,
-                                        flag: token.flag,
+                                    resolved_parameters.push(ResolvedParameter {
+                                        name: param.name,
+                                        description: param.description,
+                                        required: param.required,
+                                        parameter_type: param.parameter_type,
+                                        default: param.default,
+                                        flag: param.flag,
                                         values: resolved_values,
                                     });
                                 }
-                                resolved_commands.push(ResolvedCommand {
-                                    command: cmd.command,
-                                    description: cmd.description,
-                                    group: cmd.group,
-                                    verified: cmd.verified,
-                                    tokens: resolved_tokens,
+                                resolved_operations.push(ResolvedOperation {
+                                    command: op.command,
+                                    description: op.description,
+                                    group: op.group,
+                                    verified: op.verified,
+                                    parameters: resolved_parameters,
                                 });
                             }
                         }
@@ -99,7 +101,7 @@ impl Compiler {
 
         Ok(CompileOutput {
             context: context.clone(),
-            commands: resolved_commands,
+            operations: resolved_operations,
         })
     }
 
@@ -161,34 +163,34 @@ impl Compiler {
         ));
 
         md.push_str("\n## Available Commands\n");
-        if output.commands.is_empty() {
+        if output.operations.is_empty() {
             md.push_str("No active command schemas found matching project context.\n");
         } else {
-            for cmd in &output.commands {
-                md.push_str(&format!("### {} ({})\n", cmd.command, cmd.group));
-                md.push_str(&format!("- **Description**: {}\n", cmd.description));
-                if !cmd.tokens.is_empty() {
+            for op in &output.operations {
+                md.push_str(&format!("### {} ({})\n", op.command, op.group));
+                md.push_str(&format!("- **Description**: {}\n", op.description));
+                if !op.parameters.is_empty() {
                     md.push_str("- **Tokens**:\n");
-                    for token in &cmd.tokens {
-                        let required_str = if token.required {
+                    for param in &op.parameters {
+                        let required_str = if param.required {
                             "required"
                         } else {
                             "optional"
                         };
-                        let values_preview = if token.values.is_empty() {
+                        let values_preview = if param.values.is_empty() {
                             "none".to_string()
-                        } else if token.values.len() > 5 {
+                        } else if param.values.len() > 5 {
                             format!(
                                 "{:?} ... (and {} more)",
-                                &token.values[..5],
-                                token.values.len() - 5
+                                &param.values[..5],
+                                param.values.len() - 5
                             )
                         } else {
-                            format!("{:?}", token.values)
+                            format!("{:?}", param.values)
                         };
                         md.push_str(&format!(
                             "  - `{}` ({}): {} | Resolved values: {}\n",
-                            token.name, required_str, token.description, values_preview
+                            param.name, required_str, param.description, values_preview
                         ));
                     }
                 }
@@ -273,7 +275,7 @@ impl Compiler {
 
     fn is_schema_relevant(schema: &Schema, context: &Context) -> bool {
         if let Some(ref binary) = schema.meta.requires_binary {
-            if !Self::is_binary_available(binary) {
+            if !crate::utils::is_binary_available(binary) {
                 return false;
             }
         }
@@ -293,27 +295,6 @@ impl Compiler {
             }
         }
         true
-    }
-
-    fn is_binary_available(binary: &str) -> bool {
-        let paths = match std::env::var_os("PATH") {
-            Some(val) => std::env::split_paths(&val).collect::<Vec<_>>(),
-            None => return false,
-        };
-        for mut path in paths {
-            path.push(binary);
-            if path.is_file() {
-                return true;
-            }
-            if cfg!(target_os = "windows") {
-                let mut exe_path = path.clone();
-                exe_path.set_extension("exe");
-                if exe_path.is_file() {
-                    return true;
-                }
-            }
-        }
-        false
     }
 }
 

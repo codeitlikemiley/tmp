@@ -1,6 +1,9 @@
 use super::*;
 use crate::context::Context;
-use crate::schema::{Command, Schema, SchemaMeta, Token, TokenType};
+use crate::schema::{
+    Approval, Effect, Operation, OutputMode, OutputPolicyConfig, Parameter, ParameterType, Risk,
+    Schema, SchemaMeta, Surface,
+};
 use std::fs;
 use tempfile::tempdir;
 
@@ -26,21 +29,30 @@ fn dummy_schema(
             requires_binary: binary.map(|s| s.to_string()),
             keywords: vec![],
         },
-        commands: vec![Command {
+        operations: vec![Operation {
             command: format!("{} run", tool),
             description: "runs tool".to_string(),
             group: tool.to_string(),
             verified: true,
-            tokens: vec![Token {
+            parameters: vec![Parameter {
                 name: "param".to_string(),
                 description: "a param".to_string(),
                 required: true,
-                token_type: TokenType::String,
+                parameter_type: ParameterType::String,
                 default: Some("default_val".to_string()),
                 values: None,
                 flag: Some("--param".to_string()),
                 data_source: None,
             }],
+            surface: Surface::Cli,
+            effect: Effect::BuildTest,
+            risk: Risk::Low,
+            approval: Approval::NotRequired,
+            evidence: vec![],
+            output_policy: OutputPolicyConfig {
+                mode: OutputMode::Raw,
+                raw_retention: None,
+            },
         }],
     }
 }
@@ -73,7 +85,7 @@ fn test_compiler_relevance_binary_available() {
 
     // A common binary like "cargo" or "git" (or shell command "sh") might be available,
     // but to be safe we can check "sh".
-    let has_sh = Compiler::is_binary_available("sh");
+    let has_sh = crate::utils::is_binary_available("sh");
     let schema_sh = dummy_schema("mytool", Some("sh"), None, None);
     assert_eq!(Compiler::is_schema_relevant(&schema_sh, &context), has_sh);
 }
@@ -180,8 +192,8 @@ fn test_compile_and_write_to_disk() {
 
     // Test Compiler::compile
     let output = Compiler::compile(root, &context, Some(config_path.to_str().unwrap())).unwrap();
-    assert_eq!(output.commands.len(), 1);
-    assert_eq!(output.commands[0].command, "git run");
+    assert_eq!(output.operations.len(), 1);
+    assert_eq!(output.operations[0].command, "git run");
 
     // Create CLAUDE.md to check if it's picked up in generate_markdown
     fs::write(root.join("CLAUDE.md"), "CLAUDE RULES").unwrap();

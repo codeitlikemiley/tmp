@@ -169,17 +169,19 @@ pub mod server {
         pub stderr: String,
     }
 
-    pub(crate) fn validate_and_canonicalize_path(input_path: &str) -> Result<PathBuf, anyhow::Error> {
+    pub(crate) fn validate_and_canonicalize_path(
+        input_path: &str,
+    ) -> Result<PathBuf, anyhow::Error> {
         let path = StdPath::new(input_path);
-        
+
         let mut existing_ancestor = if path.is_absolute() {
             path.to_path_buf()
         } else {
             std::env::current_dir()?.join(path)
         };
-        
+
         let mut remaining = Vec::new();
-        
+
         while !existing_ancestor.exists() {
             if let Some(component) = existing_ancestor.components().next_back() {
                 remaining.push(component.as_os_str().to_os_string());
@@ -188,19 +190,19 @@ pub mod server {
                 break;
             }
         }
-        
+
         remaining.reverse();
-        
+
         let canonical_ancestor = if existing_ancestor.exists() {
             existing_ancestor.canonicalize()?
         } else {
             std::env::current_dir()?.canonicalize()?
         };
-        
-        let full_path = remaining.iter().fold(canonical_ancestor, |acc, component| {
-            acc.join(component)
-        });
-        
+
+        let full_path = remaining
+            .iter()
+            .fold(canonical_ancestor, |acc, component| acc.join(component));
+
         // Normalize redundant/relative components (like ., ..)
         let mut normalized = PathBuf::new();
         for component in full_path.components() {
@@ -214,22 +216,24 @@ pub mod server {
                 std::path::Component::Normal(c) => normalized.push(c),
             }
         }
-        
-        let workspace_dir = StdPath::new("/Volumes/goldcoders/tmp").canonicalize()
+
+        let workspace_dir = StdPath::new("/Volumes/goldcoders/tmp")
+            .canonicalize()
             .unwrap_or_else(|_| PathBuf::from("/Volumes/goldcoders/tmp"));
-        let temp_dir = std::env::temp_dir().canonicalize()
+        let temp_dir = std::env::temp_dir()
+            .canonicalize()
             .unwrap_or_else(|_| std::env::temp_dir());
-            
+
         if normalized.starts_with(&workspace_dir) || normalized.starts_with(&temp_dir) {
             Ok(normalized)
         } else {
-            Err(anyhow::anyhow!("Path traversal detected: target path is outside allowed sandbox directories"))
+            Err(anyhow::anyhow!(
+                "Path traversal detected: target path is outside allowed sandbox directories"
+            ))
         }
     }
 
-    pub async fn execute_handler(
-        Json(payload): Json<ExecuteRequest>,
-    ) -> Json<ExecuteResponse> {
+    pub async fn execute_handler(Json(payload): Json<ExecuteRequest>) -> Json<ExecuteResponse> {
         let mut cmd = tokio::process::Command::new(&payload.command);
         if let Some(ref args) = payload.args {
             cmd.args(args);
@@ -238,22 +242,18 @@ pub mod server {
             cmd.current_dir(cwd);
         }
         match cmd.output().await {
-            Ok(output) => {
-                Json(ExecuteResponse {
-                    success: output.status.success(),
-                    exit_code: output.status.code(),
-                    stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-                    stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-                })
-            }
-            Err(e) => {
-                Json(ExecuteResponse {
-                    success: false,
-                    exit_code: None,
-                    stdout: String::new(),
-                    stderr: format!("Failed to execute command: {}", e),
-                })
-            }
+            Ok(output) => Json(ExecuteResponse {
+                success: output.status.success(),
+                exit_code: output.status.code(),
+                stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            }),
+            Err(e) => Json(ExecuteResponse {
+                success: false,
+                exit_code: None,
+                stdout: String::new(),
+                stderr: format!("Failed to execute command: {}", e),
+            }),
         }
     }
 
@@ -270,9 +270,7 @@ pub mod server {
         pub error: Option<String>,
     }
 
-    pub async fn read_file_handler(
-        Json(payload): Json<ReadFileRequest>,
-    ) -> Json<ReadFileResponse> {
+    pub async fn read_file_handler(Json(payload): Json<ReadFileRequest>) -> Json<ReadFileResponse> {
         let validated_path = match validate_and_canonicalize_path(&payload.path) {
             Ok(p) => p,
             Err(e) => {
@@ -358,7 +356,7 @@ pub mod server {
         Json(payload): Json<SubagentRequest>,
     ) -> Json<SubagentResponse> {
         let subagent_id = uuid::Uuid::new_v4().to_string();
-        
+
         {
             let mut keys = state.subagent_keys.lock().await;
             let mut map = state.subagents.lock().await;
@@ -388,7 +386,8 @@ pub mod server {
                         Err(e) => {
                             let mut map = subagents_map.lock().await;
                             if let Some(status) = map.get_mut(&subagent_id_clone) {
-                                *status = SubagentStatus::Failure(format!("Agent chat error: {}", e));
+                                *status =
+                                    SubagentStatus::Failure(format!("Agent chat error: {}", e));
                             }
                         }
                     }
@@ -415,9 +414,13 @@ pub mod server {
         if let Some(status) = subagents.get(&id) {
             (StatusCode::OK, Json(status.clone())).into_response()
         } else {
-            (StatusCode::NOT_FOUND, Json(serde_json::json!({
-                "error": "Subagent ID not found"
-            }))).into_response()
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({
+                    "error": "Subagent ID not found"
+                })),
+            )
+                .into_response()
         }
     }
 
@@ -433,9 +436,7 @@ pub mod server {
         pub success: bool,
     }
 
-    pub async fn log_handler(
-        Json(payload): Json<LogRequest>,
-    ) -> Json<LogResponse> {
+    pub async fn log_handler(Json(payload): Json<LogRequest>) -> Json<LogResponse> {
         let level = payload.level.as_deref().unwrap_or("info");
         match level.to_lowercase().as_str() {
             "error" => tracing::error!("{}", payload.message),
@@ -466,27 +467,33 @@ pub mod server {
         pub error: Option<String>,
     }
 
-    pub async fn tables_handler(
-        Json(payload): Json<TablesRequest>,
-    ) -> impl IntoResponse {
+    pub async fn tables_handler(Json(payload): Json<TablesRequest>) -> impl IntoResponse {
         match get_tables(&payload.connection).await {
-            Ok(tables) => (StatusCode::OK, Json(TablesResponse {
-                success: true,
-                tables: Some(tables),
-                error: None,
-            })).into_response(),
-            Err(e) => (StatusCode::BAD_REQUEST, Json(TablesResponse {
-                success: false,
-                tables: None,
-                error: Some(e.to_string()),
-            })).into_response(),
+            Ok(tables) => (
+                StatusCode::OK,
+                Json(TablesResponse {
+                    success: true,
+                    tables: Some(tables),
+                    error: None,
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(TablesResponse {
+                    success: false,
+                    tables: None,
+                    error: Some(e.to_string()),
+                }),
+            )
+                .into_response(),
         }
     }
 
     pub(crate) fn strip_sql_comments(sql: &str) -> String {
         let mut result = String::new();
         let mut chars = sql.chars().peekable();
-        
+
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum State {
             Normal,
@@ -495,9 +502,9 @@ pub mod server {
             SingleLineComment,
             MultiLineComment,
         }
-        
+
         let mut state = State::Normal;
-        
+
         while let Some(c) = chars.next() {
             match state {
                 State::Normal => {
@@ -550,7 +557,7 @@ pub mod server {
         let mut tokens = Vec::new();
         let mut current_token = String::new();
         let mut chars = sql.chars().peekable();
-        
+
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum State {
             Normal,
@@ -559,9 +566,9 @@ pub mod server {
             SingleLineComment,
             MultiLineComment,
         }
-        
+
         let mut state = State::Normal;
-        
+
         while let Some(c) = chars.next() {
             match state {
                 State::Normal => {
@@ -623,11 +630,11 @@ pub mod server {
                 }
             }
         }
-        
+
         if !current_token.is_empty() {
             tokens.push(current_token);
         }
-        
+
         tokens
     }
 
@@ -635,7 +642,10 @@ pub mod server {
     async fn get_tables(connection: &DbConnectionPayload) -> Result<Vec<String>, anyhow::Error> {
         if let Some(ref path) = connection.sqlite_path {
             if !std::path::Path::new(path).exists() {
-                return Err(anyhow::anyhow!("SQLite database file does not exist: {}", path));
+                return Err(anyhow::anyhow!(
+                    "SQLite database file does not exist: {}",
+                    path
+                ));
             }
             let path = path.clone();
             tokio::task::spawn_blocking(move || {
@@ -650,11 +660,18 @@ pub mod server {
             }).await?
         } else if let Some(ref url) = connection.pg_url {
             let client = crate::db::init_postgres(url).await?;
-            let rows = client.query("SELECT table_name FROM information_schema.tables WHERE table_schema='public'", &[]).await?;
+            let rows = client
+                .query(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public'",
+                    &[],
+                )
+                .await?;
             let tables = rows.iter().map(|row| row.get::<_, String>(0)).collect();
             Ok(tables)
         } else {
-            Err(anyhow::anyhow!("Either sqlite_path or pg_url must be provided"))
+            Err(anyhow::anyhow!(
+                "Either sqlite_path or pg_url must be provided"
+            ))
         }
     }
 
@@ -678,20 +695,26 @@ pub mod server {
         pub error: Option<String>,
     }
 
-    pub async fn columns_handler(
-        Json(payload): Json<ColumnsRequest>,
-    ) -> impl IntoResponse {
+    pub async fn columns_handler(Json(payload): Json<ColumnsRequest>) -> impl IntoResponse {
         match get_columns(&payload.table_name, &payload.connection).await {
-            Ok(columns) => (StatusCode::OK, Json(ColumnsResponse {
-                success: true,
-                columns: Some(columns),
-                error: None,
-            })).into_response(),
-            Err(e) => (StatusCode::BAD_REQUEST, Json(ColumnsResponse {
-                success: false,
-                columns: None,
-                error: Some(e.to_string()),
-            })).into_response(),
+            Ok(columns) => (
+                StatusCode::OK,
+                Json(ColumnsResponse {
+                    success: true,
+                    columns: Some(columns),
+                    error: None,
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(ColumnsResponse {
+                    success: false,
+                    columns: None,
+                    error: Some(e.to_string()),
+                }),
+            )
+                .into_response(),
         }
     }
 
@@ -706,12 +729,18 @@ pub mod server {
 
         if let Some(ref path) = connection.sqlite_path {
             if !std::path::Path::new(path).exists() {
-                return Err(anyhow::anyhow!("SQLite database file does not exist: {}", path));
+                return Err(anyhow::anyhow!(
+                    "SQLite database file does not exist: {}",
+                    path
+                ));
             }
             let path = path.clone();
             let table = table_name.to_string();
             tokio::task::spawn_blocking(move || {
-                let conn = rusqlite::Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+                let conn = rusqlite::Connection::open_with_flags(
+                    &path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                )?;
                 let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
                 let rows = stmt.query_map([], |row| {
                     Ok(ColumnInfo {
@@ -724,20 +753,26 @@ pub mod server {
                     columns.push(r?);
                 }
                 Ok(columns)
-            }).await?
+            })
+            .await?
         } else if let Some(ref url) = connection.pg_url {
             let client = crate::db::init_postgres(url).await?;
             let rows = client.query(
                 "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = $1 AND table_schema = 'public'",
                 &[&table_name],
             ).await?;
-            let columns = rows.iter().map(|row| ColumnInfo {
-                name: row.get::<_, String>(0),
-                data_type: row.get::<_, String>(1),
-            }).collect();
+            let columns = rows
+                .iter()
+                .map(|row| ColumnInfo {
+                    name: row.get::<_, String>(0),
+                    data_type: row.get::<_, String>(1),
+                })
+                .collect();
             Ok(columns)
         } else {
-            Err(anyhow::anyhow!("Either sqlite_path or pg_url must be provided"))
+            Err(anyhow::anyhow!(
+                "Either sqlite_path or pg_url must be provided"
+            ))
         }
     }
 
@@ -755,20 +790,26 @@ pub mod server {
         pub error: Option<String>,
     }
 
-    pub async fn query_handler(
-        Json(payload): Json<QueryRequest>,
-    ) -> impl IntoResponse {
+    pub async fn query_handler(Json(payload): Json<QueryRequest>) -> impl IntoResponse {
         match run_query(&payload.query, &payload.connection).await {
-            Ok(rows) => (StatusCode::OK, Json(QueryResponse {
-                success: true,
-                rows: Some(rows),
-                error: None,
-            })).into_response(),
-            Err(e) => (StatusCode::BAD_REQUEST, Json(QueryResponse {
-                success: false,
-                rows: None,
-                error: Some(e.to_string()),
-            })).into_response(),
+            Ok(rows) => (
+                StatusCode::OK,
+                Json(QueryResponse {
+                    success: true,
+                    rows: Some(rows),
+                    error: None,
+                }),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::BAD_REQUEST,
+                Json(QueryResponse {
+                    success: false,
+                    rows: None,
+                    error: Some(e.to_string()),
+                }),
+            )
+                .into_response(),
         }
     }
 
@@ -783,26 +824,41 @@ pub mod server {
         if !upper.starts_with("SELECT") && !upper.starts_with("WITH") {
             return Err(anyhow::anyhow!("Only SELECT or WITH queries are allowed"));
         }
-        
-        let mutating_keywords = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "REPLACE"];
+
+        let mutating_keywords = [
+            "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "REPLACE",
+        ];
         let tokens = tokenize_excluding_strings(query);
         for token in tokens {
             let token_upper = token.to_uppercase();
             if mutating_keywords.contains(&token_upper.as_str()) {
-                return Err(anyhow::anyhow!("Query contains mutating keyword: {}", token));
+                return Err(anyhow::anyhow!(
+                    "Query contains mutating keyword: {}",
+                    token
+                ));
             }
         }
 
         if let Some(ref path) = connection.sqlite_path {
             if !std::path::Path::new(path).exists() {
-                return Err(anyhow::anyhow!("SQLite database file does not exist: {}", path));
+                return Err(anyhow::anyhow!(
+                    "SQLite database file does not exist: {}",
+                    path
+                ));
             }
             let path = path.clone();
             let query = query.to_string();
             tokio::task::spawn_blocking(move || {
-                let conn = rusqlite::Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+                let conn = rusqlite::Connection::open_with_flags(
+                    &path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                )?;
                 let mut stmt = conn.prepare(&query)?;
-                let column_names: Vec<String> = stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+                let column_names: Vec<String> = stmt
+                    .column_names()
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect();
                 let mut rows = stmt.query([])?;
                 let mut result = Vec::new();
                 while let Some(row) = rows.next()? {
@@ -811,7 +867,9 @@ pub mod server {
                         let val: rusqlite::types::Value = row.get(i)?;
                         let json_val = match val {
                             rusqlite::types::Value::Null => serde_json::Value::Null,
-                            rusqlite::types::Value::Integer(v) => serde_json::Value::Number(v.into()),
+                            rusqlite::types::Value::Integer(v) => {
+                                serde_json::Value::Number(v.into())
+                            }
                             rusqlite::types::Value::Real(v) => {
                                 if let Some(n) = serde_json::Number::from_f64(v) {
                                     serde_json::Value::Number(n)
@@ -820,18 +878,22 @@ pub mod server {
                                 }
                             }
                             rusqlite::types::Value::Text(v) => serde_json::Value::String(v),
-                            rusqlite::types::Value::Blob(v) => {
-                                serde_json::Value::String(String::from_utf8(v).unwrap_or_else(|b| {
-                                    b.into_bytes().iter().map(|byte| format!("{:02x}", byte)).collect()
-                                }))
-                            }
+                            rusqlite::types::Value::Blob(v) => serde_json::Value::String(
+                                String::from_utf8(v).unwrap_or_else(|b| {
+                                    b.into_bytes()
+                                        .iter()
+                                        .map(|byte| format!("{:02x}", byte))
+                                        .collect()
+                                }),
+                            ),
                         };
                         map.insert(name.clone(), json_val);
                     }
                     result.push(serde_json::Value::Object(map));
                 }
                 Ok(result)
-            }).await?
+            })
+            .await?
         } else if let Some(ref url) = connection.pg_url {
             let client = crate::db::init_postgres(url).await?;
             let rows = client.query(query, &[]).await?;
@@ -844,29 +906,61 @@ pub mod server {
                         let name = col.name().to_string();
                         let pg_type = col.type_();
                         let json_val = match pg_type.name() {
-                            "bool" => row.get::<_, Option<bool>>(i).map_or(serde_json::Value::Null, serde_json::Value::Bool),
-                            "int2" => row.get::<_, Option<i16>>(i).map_or(serde_json::Value::Null, |v| serde_json::Value::Number(v.into())),
-                            "int4" => row.get::<_, Option<i32>>(i).map_or(serde_json::Value::Null, |v| serde_json::Value::Number(v.into())),
-                            "int8" => row.get::<_, Option<i64>>(i).map_or(serde_json::Value::Null, |v| serde_json::Value::Number(v.into())),
-                            "float4" => row.get::<_, Option<f32>>(i).map_or(serde_json::Value::Null, |v| {
-                                serde_json::Number::from_f64(v as f64).map_or(serde_json::Value::Null, serde_json::Value::Number)
-                            }),
-                            "float8" => row.get::<_, Option<f64>>(i).map_or(serde_json::Value::Null, |v| {
-                                serde_json::Number::from_f64(v).map_or(serde_json::Value::Null, serde_json::Value::Number)
-                            }),
-                            "text" | "varchar" | "bpchar" | "name" => {
-                                row.get::<_, Option<String>>(i).map_or(serde_json::Value::Null, serde_json::Value::String)
+                            "bool" => row
+                                .get::<_, Option<bool>>(i)
+                                .map_or(serde_json::Value::Null, serde_json::Value::Bool),
+                            "int2" => row
+                                .get::<_, Option<i16>>(i)
+                                .map_or(serde_json::Value::Null, |v| {
+                                    serde_json::Value::Number(v.into())
+                                }),
+                            "int4" => row
+                                .get::<_, Option<i32>>(i)
+                                .map_or(serde_json::Value::Null, |v| {
+                                    serde_json::Value::Number(v.into())
+                                }),
+                            "int8" => row
+                                .get::<_, Option<i64>>(i)
+                                .map_or(serde_json::Value::Null, |v| {
+                                    serde_json::Value::Number(v.into())
+                                }),
+                            "float4" => {
+                                row.get::<_, Option<f32>>(i)
+                                    .map_or(serde_json::Value::Null, |v| {
+                                        serde_json::Number::from_f64(v as f64).map_or(
+                                            serde_json::Value::Null,
+                                            serde_json::Value::Number,
+                                        )
+                                    })
                             }
-                            "bytea" => {
-                                row.get::<_, Option<Vec<u8>>>(i).map_or(serde_json::Value::Null, |bytes| {
-                                    serde_json::Value::String(bytes.iter().map(|b| format!("{:02x}", b)).collect())
-                                })
+                            "float8" => {
+                                row.get::<_, Option<f64>>(i)
+                                    .map_or(serde_json::Value::Null, |v| {
+                                        serde_json::Number::from_f64(v).map_or(
+                                            serde_json::Value::Null,
+                                            serde_json::Value::Number,
+                                        )
+                                    })
                             }
+                            "text" | "varchar" | "bpchar" | "name" => row
+                                .get::<_, Option<String>>(i)
+                                .map_or(serde_json::Value::Null, serde_json::Value::String),
+                            "bytea" => row.get::<_, Option<Vec<u8>>>(i).map_or(
+                                serde_json::Value::Null,
+                                |bytes| {
+                                    serde_json::Value::String(
+                                        bytes.iter().map(|b| format!("{:02x}", b)).collect(),
+                                    )
+                                },
+                            ),
                             _ => {
                                 if let Ok(Some(s)) = row.try_get::<_, Option<String>>(i) {
                                     serde_json::Value::String(s)
                                 } else {
-                                    serde_json::Value::String(format!("<unsupported type: {}>", pg_type.name()))
+                                    serde_json::Value::String(format!(
+                                        "<unsupported type: {}>",
+                                        pg_type.name()
+                                    ))
                                 }
                             }
                         };
@@ -877,7 +971,9 @@ pub mod server {
             }
             Ok(result)
         } else {
-            Err(anyhow::anyhow!("Either sqlite_path or pg_url must be provided"))
+            Err(anyhow::anyhow!(
+                "Either sqlite_path or pg_url must be provided"
+            ))
         }
     }
 }
@@ -950,7 +1046,10 @@ mod tests {
         };
         let read_resp = read_file_handler(axum::Json(read_payload)).await;
         assert!(read_resp.success);
-        assert_eq!(read_resp.content.as_deref(), Some("hello world from unit test"));
+        assert_eq!(
+            read_resp.content.as_deref(),
+            Some("hello world from unit test")
+        );
         assert!(read_resp.error.is_none());
 
         // 3. Clean up
@@ -996,11 +1095,13 @@ mod tests {
                     score REAL
                 )",
                 [],
-            ).unwrap();
+            )
+            .unwrap();
             conn.execute(
                 "INSERT INTO test_users (username, score) VALUES ('alice', 95.5)",
                 [],
-            ).unwrap();
+            )
+            .unwrap();
         }
 
         let connection_payload = DbConnectionPayload {
@@ -1012,10 +1113,14 @@ mod tests {
         let tables_payload = TablesRequest {
             connection: connection_payload.clone(),
         };
-        let tables_resp = tables_handler(axum::Json(tables_payload)).await.into_response();
+        let tables_resp = tables_handler(axum::Json(tables_payload))
+            .await
+            .into_response();
         assert_eq!(tables_resp.status(), axum::http::StatusCode::OK);
-        
-        let body_bytes = axum::body::to_bytes(tables_resp.into_body(), usize::MAX).await.unwrap();
+
+        let body_bytes = axum::body::to_bytes(tables_resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let tables_data: TablesResponse = serde_json::from_slice(&body_bytes).unwrap();
         assert!(tables_data.success);
         let tables = tables_data.tables.expect("Expected tables list");
@@ -1026,10 +1131,14 @@ mod tests {
             table_name: "test_users".to_string(),
             connection: connection_payload.clone(),
         };
-        let columns_resp = columns_handler(axum::Json(columns_payload)).await.into_response();
+        let columns_resp = columns_handler(axum::Json(columns_payload))
+            .await
+            .into_response();
         assert_eq!(columns_resp.status(), axum::http::StatusCode::OK);
 
-        let body_bytes = axum::body::to_bytes(columns_resp.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(columns_resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let columns_data: ColumnsResponse = serde_json::from_slice(&body_bytes).unwrap();
         assert!(columns_data.success);
         let columns = columns_data.columns.expect("Expected columns list");
@@ -1043,30 +1152,50 @@ mod tests {
             query: "SELECT username, score FROM test_users".to_string(),
             connection: connection_payload.clone(),
         };
-        let query_resp = query_handler(axum::Json(query_payload)).await.into_response();
+        let query_resp = query_handler(axum::Json(query_payload))
+            .await
+            .into_response();
         assert_eq!(query_resp.status(), axum::http::StatusCode::OK);
 
-        let body_bytes = axum::body::to_bytes(query_resp.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(query_resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let query_data: QueryResponse = serde_json::from_slice(&body_bytes).unwrap();
         assert!(query_data.success);
         let rows = query_data.rows.expect("Expected rows");
         assert_eq!(rows.len(), 1);
         let row = &rows[0];
-        assert_eq!(row["username"], serde_json::Value::String("alice".to_string()));
-        assert_eq!(row["score"], serde_json::Value::Number(serde_json::Number::from_f64(95.5).unwrap()));
+        assert_eq!(
+            row["username"],
+            serde_json::Value::String("alice".to_string())
+        );
+        assert_eq!(
+            row["score"],
+            serde_json::Value::Number(serde_json::Number::from_f64(95.5).unwrap())
+        );
 
         // 4. Test query endpoint (invalid SELECT / mutation statement error)
         let invalid_query_payload = QueryRequest {
             query: "INSERT INTO test_users (username, score) VALUES ('bob', 88.0)".to_string(),
             connection: connection_payload.clone(),
         };
-        let invalid_query_resp = query_handler(axum::Json(invalid_query_payload)).await.into_response();
-        assert_eq!(invalid_query_resp.status(), axum::http::StatusCode::BAD_REQUEST);
+        let invalid_query_resp = query_handler(axum::Json(invalid_query_payload))
+            .await
+            .into_response();
+        assert_eq!(
+            invalid_query_resp.status(),
+            axum::http::StatusCode::BAD_REQUEST
+        );
 
-        let body_bytes = axum::body::to_bytes(invalid_query_resp.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(invalid_query_resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let invalid_query_data: QueryResponse = serde_json::from_slice(&body_bytes).unwrap();
         assert!(!invalid_query_data.success);
-        assert!(invalid_query_data.error.unwrap().contains("Only SELECT or WITH queries are allowed"));
+        assert!(invalid_query_data
+            .error
+            .unwrap()
+            .contains("Only SELECT or WITH queries are allowed"));
 
         // Clean up DB file
         let _ = std::fs::remove_file(&db_path);
@@ -1091,7 +1220,10 @@ mod tests {
         let invalid_path = "/Volumes/goldcoders/tmp/../../etc/passwd";
         let res3 = validate_and_canonicalize_path(invalid_path);
         assert!(res3.is_err());
-        assert!(res3.unwrap_err().to_string().contains("Path traversal detected"));
+        assert!(res3
+            .unwrap_err()
+            .to_string()
+            .contains("Path traversal detected"));
     }
 
     #[test]
@@ -1124,9 +1256,13 @@ mod tests {
             query: "WITH cte AS (SELECT 1) SELECT * FROM cte".to_string(),
             connection: connection_payload.clone(),
         };
-        let resp = query_handler(axum::Json(query_payload)).await.into_response();
+        let resp = query_handler(axum::Json(query_payload))
+            .await
+            .into_response();
         assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
-        let body_bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let data: QueryResponse = serde_json::from_slice(&body_bytes).unwrap();
         assert!(!data.success);
         assert!(data.error.unwrap().contains("does not exist"));
@@ -1137,8 +1273,12 @@ mod tests {
             query: "SELECT 'INSERT' AS val".to_string(),
             connection: connection_payload.clone(),
         };
-        let resp2 = query_handler(axum::Json(query_payload2)).await.into_response();
-        let body_bytes2 = axum::body::to_bytes(resp2.into_body(), usize::MAX).await.unwrap();
+        let resp2 = query_handler(axum::Json(query_payload2))
+            .await
+            .into_response();
+        let body_bytes2 = axum::body::to_bytes(resp2.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let data2: QueryResponse = serde_json::from_slice(&body_bytes2).unwrap();
         assert!(data2.error.unwrap().contains("does not exist")); // implies SQL validation passed!
 
@@ -1147,10 +1287,17 @@ mod tests {
             query: "SELECT 1; DROP TABLE users;".to_string(),
             connection: connection_payload.clone(),
         };
-        let resp3 = query_handler(axum::Json(query_payload3)).await.into_response();
-        let body_bytes3 = axum::body::to_bytes(resp3.into_body(), usize::MAX).await.unwrap();
+        let resp3 = query_handler(axum::Json(query_payload3))
+            .await
+            .into_response();
+        let body_bytes3 = axum::body::to_bytes(resp3.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let data3: QueryResponse = serde_json::from_slice(&body_bytes3).unwrap();
-        assert!(data3.error.unwrap().contains("Query contains mutating keyword"));
+        assert!(data3
+            .error
+            .unwrap()
+            .contains("Query contains mutating keyword"));
     }
 
     #[tokio::test]
@@ -1174,7 +1321,7 @@ mod tests {
         // Check map and queue sizes
         let map = state.subagents.lock().await;
         let keys = state.subagent_keys.lock().await;
-        
+
         assert_eq!(keys.len(), 100);
         assert_eq!(map.len(), 100);
     }
@@ -1198,8 +1345,9 @@ mod tests {
         let subagent_resp = subagent_handler(
             axum::extract::State(state.clone()),
             axum::Json(subagent_req),
-        ).await;
-        
+        )
+        .await;
+
         let subagent_id = subagent_resp.subagent_id.clone();
         assert!(!subagent_id.is_empty());
 
@@ -1217,10 +1365,14 @@ mod tests {
         let get_resp = get_subagent_handler(
             axum::extract::State(state.clone()),
             axum::extract::Path(subagent_id.clone()),
-        ).await.into_response();
+        )
+        .await
+        .into_response();
         assert_eq!(get_resp.status(), axum::http::StatusCode::OK);
 
-        let body_bytes = axum::body::to_bytes(get_resp.into_body(), usize::MAX).await.unwrap();
+        let body_bytes = axum::body::to_bytes(get_resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
         let status: SubagentStatus = serde_json::from_slice(&body_bytes).unwrap();
         match status {
             SubagentStatus::Running => {}
@@ -1231,7 +1383,9 @@ mod tests {
         let get_fail_resp = get_subagent_handler(
             axum::extract::State(state.clone()),
             axum::extract::Path("non-existent-uuid".to_string()),
-        ).await.into_response();
+        )
+        .await
+        .into_response();
         assert_eq!(get_fail_resp.status(), axum::http::StatusCode::NOT_FOUND);
     }
 }

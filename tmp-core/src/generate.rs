@@ -1,4 +1,7 @@
-use crate::schema::{Command, Schema, SchemaMeta, Token, TokenType};
+use crate::schema::{
+    Approval, Effect, Operation, OutputMode, OutputPolicyConfig, Parameter, ParameterType, Risk,
+    Schema, SchemaMeta, Surface,
+};
 use std::collections::BTreeSet;
 
 struct HelpSection {
@@ -19,16 +22,25 @@ pub fn generate_schema_from_help(tool: &str, help_text: &str) -> Schema {
         .collect::<BTreeSet<_>>();
 
     let mut seen = BTreeSet::new();
-    let mut commands = Vec::new();
+    let mut operations = Vec::new();
 
     for section in &sections {
         if seen.insert(section.command.clone()) {
-            commands.push(Command {
+            operations.push(Operation {
                 command: section.command.clone(),
                 description: description_for_section(&section.body, &section.command),
                 group: "help".to_string(),
                 verified: false,
-                tokens: parse_options(&section.body),
+                parameters: parse_options(&section.body),
+                surface: Surface::Cli,
+                effect: Effect::BuildTest,
+                risk: Risk::Low,
+                approval: Approval::NotRequired,
+                evidence: Vec::new(),
+                output_policy: OutputPolicyConfig {
+                    mode: OutputMode::Raw,
+                    raw_retention: None,
+                },
             });
         }
     }
@@ -40,12 +52,21 @@ pub fn generate_schema_from_help(tool: &str, help_text: &str) -> Schema {
                 continue;
             }
 
-            commands.push(Command {
+            operations.push(Operation {
                 command,
                 description: subcommand.description,
                 group: "help".to_string(),
                 verified: false,
-                tokens: Vec::new(),
+                parameters: Vec::new(),
+                surface: Surface::Cli,
+                effect: Effect::BuildTest,
+                risk: Risk::Low,
+                approval: Approval::NotRequired,
+                evidence: Vec::new(),
+                output_policy: OutputPolicyConfig {
+                    mode: OutputMode::Raw,
+                    raw_retention: None,
+                },
             });
         }
     }
@@ -66,7 +87,7 @@ pub fn generate_schema_from_help(tool: &str, help_text: &str) -> Schema {
             requires_binary: None,
             keywords: Vec::new(),
         },
-        commands,
+        operations,
     }
 }
 
@@ -186,8 +207,8 @@ fn parse_subcommands(help_text: &str) -> Vec<SubcommandEntry> {
     subcommands
 }
 
-fn parse_options(help_text: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
+fn parse_options(help_text: &str) -> Vec<Parameter> {
+    let mut parameters = Vec::new();
     let mut seen = BTreeSet::new();
     let mut in_options_section = false;
 
@@ -209,21 +230,21 @@ fn parse_options(help_text: &str) -> Vec<Token> {
                 continue;
             }
 
-            let Some(token) = parse_option_line(trimmed) else {
+            let Some(param) = parse_option_line(trimmed) else {
                 continue;
             };
-            if seen.insert(token.name.clone()) {
-                tokens.push(token);
+            if seen.insert(param.name.clone()) {
+                parameters.push(param);
             }
         } else if is_options_header(&lower) {
             in_options_section = true;
         }
     }
 
-    tokens
+    parameters
 }
 
-fn parse_option_line(trimmed: &str) -> Option<Token> {
+fn parse_option_line(trimmed: &str) -> Option<Parameter> {
     if !trimmed.starts_with('-') {
         return None;
     }
@@ -251,7 +272,7 @@ fn parse_option_line(trimmed: &str) -> Option<Token> {
             .skip(1)
             .any(|part| !part.starts_with('-') && part.chars().any(|c| c.is_ascii_uppercase()));
 
-    Some(Token {
+    Some(Parameter {
         name,
         description: if description.is_empty() {
             format!("Draft option parsed from `{flag}`")
@@ -259,10 +280,10 @@ fn parse_option_line(trimmed: &str) -> Option<Token> {
             description.to_string()
         },
         required: false,
-        token_type: if takes_value {
-            TokenType::String
+        parameter_type: if takes_value {
+            ParameterType::String
         } else {
-            TokenType::Boolean
+            ParameterType::Boolean
         },
         default: None,
         values: None,
@@ -340,21 +361,21 @@ Options:
         assert_eq!(schema.meta.tool, "custom-tool");
         assert!(!schema.meta.verified);
         assert!(schema
-            .commands
+            .operations
             .iter()
             .any(|cmd| cmd.command == "custom-tool"));
         assert!(schema
-            .commands
+            .operations
             .iter()
             .any(|cmd| cmd.command == "custom-tool run"));
 
         let root = schema
-            .commands
+            .operations
             .iter()
             .find(|cmd| cmd.command == "custom-tool")
             .unwrap();
-        assert!(root.tokens.iter().any(|token| token.name == "verbose"));
-        assert!(root.tokens.iter().any(|token| token.name == "config"));
+        assert!(root.parameters.iter().any(|token| token.name == "verbose"));
+        assert!(root.parameters.iter().any(|token| token.name == "config"));
     }
 
     #[test]
@@ -371,17 +392,17 @@ Options:
 
         let schema = generate_schema_from_help("tool", help);
         let run_commands = schema
-            .commands
+            .operations
             .iter()
             .filter(|cmd| cmd.command == "tool run")
             .count();
         assert_eq!(run_commands, 1);
         assert!(schema
-            .commands
+            .operations
             .iter()
             .find(|cmd| cmd.command == "tool run")
             .unwrap()
-            .tokens
+            .parameters
             .iter()
             .any(|token| token.name == "dry_run"));
     }

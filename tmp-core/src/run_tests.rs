@@ -37,6 +37,27 @@ fn test_run_dry_run_with_malformed_last_command() {
 }
 
 #[test]
+fn run_captures_stdout_from_last_command() {
+    let temp_dir = tempdir().unwrap();
+    let root = temp_dir.path();
+
+    let tmp_dir = root.join(".tmp");
+    fs::create_dir_all(&tmp_dir).unwrap();
+    fs::write(
+        tmp_dir.join("last_command.json"),
+        r#"{"command":"echo captured-output"}"#,
+    )
+    .unwrap();
+
+    let res = run(None, false, root.to_str().unwrap()).unwrap();
+    assert!(
+        res.stdout.contains("captured-output"),
+        "stdout should contain captured-output, got {:?}",
+        res.stdout
+    );
+}
+
+#[test]
 fn test_resolve_locally_single_file_script() {
     let context = Context {
         cwd: "/dummy".to_string(),

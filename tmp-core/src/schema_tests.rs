@@ -54,27 +54,36 @@ fn test_parse_valid_schema() {
         vec!["vcs".to_string(), "git".to_string()]
     );
 
-    assert_eq!(schema.commands.len(), 1);
-    let cmd = &schema.commands[0];
-    assert_eq!(cmd.command, "git commit");
-    assert_eq!(cmd.tokens.len(), 2);
+    assert_eq!(schema.operations.len(), 1);
+    let op = &schema.operations[0];
+    assert_eq!(op.command, "git commit");
+    assert_eq!(op.parameters.len(), 2);
 
-    let token1 = &cmd.tokens[0];
-    assert_eq!(token1.name, "message");
-    assert_eq!(token1.token_type, TokenType::String);
-    assert!(token1.required);
-    assert_eq!(token1.flag, Some("-m".to_string()));
-    assert!(token1.data_source.is_none());
+    let param1 = &op.parameters[0];
+    assert_eq!(param1.name, "message");
+    assert_eq!(param1.parameter_type, ParameterType::String);
+    assert!(param1.required);
+    assert_eq!(param1.flag, Some("-m".to_string()));
+    assert!(param1.data_source.is_none());
 
-    let token2 = &cmd.tokens[1];
-    assert_eq!(token2.name, "branch");
-    assert_eq!(token2.token_type, TokenType::Enum);
-    assert!(!token2.required);
-    assert!(token2.data_source.is_some());
-    let ds = token2.data_source.as_ref().unwrap();
+    let param2 = &op.parameters[1];
+    assert_eq!(param2.name, "branch");
+    assert_eq!(param2.parameter_type, ParameterType::Enum);
+    assert!(!param2.required);
+    assert!(param2.data_source.is_some());
+    let ds = param2.data_source.as_ref().unwrap();
     assert_eq!(ds.resolver, Some("git:branches".to_string()));
     // Check that parse mode defaulted to "lines"
     assert_eq!(ds.parse, "lines");
+
+    // Check defaults for new metadata fields (backward compatibility)
+    assert_eq!(op.surface, Surface::Cli);
+    assert_eq!(op.effect, Effect::BuildTest);
+    assert_eq!(op.risk, Risk::Low);
+    assert_eq!(op.approval, Approval::NotRequired);
+    assert!(op.evidence.is_empty());
+    assert_eq!(op.output_policy.mode, OutputMode::Raw);
+    assert_eq!(op.output_policy.raw_retention, None);
 }
 
 #[test]
@@ -84,7 +93,7 @@ fn test_validation_empty_tool() {
             "tool": "",
             "version": 1
         },
-        "commands": []
+        "operations": []
     }"#;
     let res = Schema::from_json(json);
     assert!(res.is_err(), "Expected error for empty tool name");
@@ -101,12 +110,12 @@ fn test_validation_empty_command() {
             "tool": "test",
             "version": 1
         },
-        "commands": [
+        "operations": [
             {
                 "command": "   ",
                 "description": "empty command",
                 "group": "test",
-                "tokens": []
+                "parameters": []
             }
         ]
     }"#;
@@ -123,8 +132,8 @@ fn test_validation_invalid_token_name() {
     // Test empty token name
     let json_empty = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 { "name": "", "description": "d", "type": "String" }
             ]
         }]
@@ -139,8 +148,8 @@ fn test_validation_invalid_token_name() {
     // Test token name with whitespace
     let json_space = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 { "name": "bad name", "description": "d", "type": "String" }
             ]
         }]
@@ -155,8 +164,8 @@ fn test_validation_invalid_token_name() {
     // Test token name with invalid characters
     let json_chars = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 { "name": "bad$name", "description": "d", "type": "String" }
             ]
         }]
@@ -176,8 +185,8 @@ fn test_validation_invalid_token_name() {
 fn test_validation_invalid_parse_mode() {
     let json = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 {
                     "name": "token", "description": "d", "type": "Enum",
                     "data_source": {
@@ -201,8 +210,8 @@ fn test_validation_empty_data_source() {
     // Both command and resolver missing/None
     let json_none = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 {
                     "name": "token", "description": "d", "type": "Enum",
                     "data_source": {}
@@ -220,8 +229,8 @@ fn test_validation_empty_data_source() {
     // Command empty string
     let json_empty_cmd = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 {
                     "name": "token", "description": "d", "type": "Enum",
                     "data_source": {
@@ -241,8 +250,8 @@ fn test_validation_empty_data_source() {
     // Resolver empty string
     let json_empty_res = r#"{
         "meta": { "tool": "test", "version": 1 },
-        "commands": [{
-            "command": "test-cmd", "description": "desc", "group": "g", "tokens": [
+        "operations": [{
+            "command": "test-cmd", "description": "desc", "group": "g", "parameters": [
                 {
                     "name": "token", "description": "d", "type": "Enum",
                     "data_source": {
@@ -281,21 +290,30 @@ fn test_serialize_schema() {
             requires_binary: None,
             keywords: vec![],
         },
-        commands: vec![Command {
+        operations: vec![Operation {
             command: "test run".to_string(),
             description: "runs test".to_string(),
             group: "test".to_string(),
             verified: false,
-            tokens: vec![Token {
+            parameters: vec![Parameter {
                 name: "file".to_string(),
                 description: "file target".to_string(),
                 required: true,
-                token_type: TokenType::File,
+                parameter_type: ParameterType::File,
                 default: None,
                 values: None,
                 flag: None,
                 data_source: None,
             }],
+            surface: Surface::Cli,
+            effect: Effect::BuildTest,
+            risk: Risk::Low,
+            approval: Approval::NotRequired,
+            evidence: vec![],
+            output_policy: OutputPolicyConfig {
+                mode: OutputMode::Raw,
+                raw_retention: None,
+            },
         }],
     };
 
@@ -328,17 +346,17 @@ fn test_export_shareable() {
             requires_binary: None,
             keywords: vec![],
         },
-        commands: vec![Command {
+        operations: vec![Operation {
             command: "test run".to_string(),
             description: "runs test".to_string(),
             group: "test".to_string(),
             verified: false,
-            tokens: vec![
-                Token {
+            parameters: vec![
+                Parameter {
                     name: "dynamic-token".to_string(),
                     description: "token with source".to_string(),
                     required: false,
-                    token_type: TokenType::Enum,
+                    parameter_type: ParameterType::Enum,
                     default: None,
                     values: Some(vec!["val1".to_string(), "val2".to_string()]),
                     flag: None,
@@ -348,35 +366,44 @@ fn test_export_shareable() {
                         parse: "lines".to_string(),
                     }),
                 },
-                Token {
+                Parameter {
                     name: "static-token".to_string(),
                     description: "token without source".to_string(),
                     required: false,
-                    token_type: TokenType::Enum,
+                    parameter_type: ParameterType::Enum,
                     default: None,
                     values: Some(vec!["valA".to_string(), "valB".to_string()]),
                     flag: None,
                     data_source: None,
                 },
             ],
+            surface: Surface::Cli,
+            effect: Effect::BuildTest,
+            risk: Risk::Low,
+            approval: Approval::NotRequired,
+            evidence: vec![],
+            output_policy: OutputPolicyConfig {
+                mode: OutputMode::Raw,
+                raw_retention: None,
+            },
         }],
     };
 
     let shareable = schema.export_shareable();
 
-    // The first token (with data_source) should have values set to None
-    let token1 = &shareable.commands[0].tokens[0];
-    assert_eq!(token1.name, "dynamic-token");
+    // The first parameter (with data_source) should have values set to None
+    let param1 = &shareable.operations[0].parameters[0];
+    assert_eq!(param1.name, "dynamic-token");
     assert!(
-        token1.values.is_none(),
+        param1.values.is_none(),
         "Expected resolved values to be stripped"
     );
 
-    // The second token (without data_source) should retain its values
-    let token2 = &shareable.commands[0].tokens[1];
-    assert_eq!(token2.name, "static-token");
+    // The second parameter (without data_source) should retain its values
+    let param2 = &shareable.operations[0].parameters[1];
+    assert_eq!(param2.name, "static-token");
     assert_eq!(
-        token2.values,
+        param2.values,
         Some(vec!["valA".to_string(), "valB".to_string()])
     );
 }
@@ -388,7 +415,7 @@ fn test_validation_invalid_tool_characters() {
             "tool": "../../bad",
             "version": 1
         },
-        "commands": []
+        "operations": []
     }"#;
     let res = Schema::from_json(json_dots);
     assert!(res.is_err(), "Expected error for tool with dot/slashes");
@@ -402,7 +429,7 @@ fn test_validation_invalid_tool_characters() {
             "tool": "git/bad",
             "version": 1
         },
-        "commands": []
+        "operations": []
     }"#;
     let res = Schema::from_json(json_slash);
     assert!(res.is_err(), "Expected error for tool with slash");
@@ -410,4 +437,153 @@ fn test_validation_invalid_tool_characters() {
         res.unwrap_err().to_string().contains("alphanumeric"),
         "Error message should mention 'alphanumeric'"
     );
+}
+
+// --- validate_strict tests ---
+
+/// Helper to create a minimal valid schema with specified operations.
+fn make_schema_with_ops(operations: Vec<Operation>) -> Schema {
+    Schema {
+        meta: SchemaMeta {
+            tool: "test".to_string(),
+            version: 1,
+            author: None,
+            generated_by: None,
+            generated_with: None,
+            verified: false,
+            verified_at: None,
+            coverage: None,
+            waz_version: None,
+            requires_file: None,
+            requires_file_kind: None,
+            requires_binary: None,
+            keywords: vec![],
+        },
+        operations,
+    }
+}
+
+fn make_test_op(command: &str, effect: Effect, risk: Risk, approval: Approval) -> Operation {
+    Operation {
+        command: command.to_string(),
+        description: "test".to_string(),
+        group: "test".to_string(),
+        verified: false,
+        parameters: vec![],
+        surface: Surface::Cli,
+        effect,
+        risk,
+        approval,
+        evidence: vec![],
+        output_policy: OutputPolicyConfig {
+            mode: OutputMode::Raw,
+            raw_retention: None,
+        },
+    }
+}
+
+#[test]
+fn test_validate_strict_high_risk_not_required_warns() {
+    let schema = make_schema_with_ops(vec![make_test_op(
+        "dangerous-cmd",
+        Effect::Network,
+        Risk::High,
+        Approval::NotRequired,
+    )]);
+    let warnings = schema.validate_strict().unwrap();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("high-risk operations should require approval"));
+    assert!(warnings[0].contains("dangerous-cmd"));
+}
+
+#[test]
+fn test_validate_strict_destructive_low_risk_warns() {
+    let schema = make_schema_with_ops(vec![make_test_op(
+        "rm-cmd",
+        Effect::Destructive,
+        Risk::Low,
+        Approval::Required,
+    )]);
+    let warnings = schema.validate_strict().unwrap();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("destructive effects should not have low risk"));
+    assert!(warnings[0].contains("rm-cmd"));
+}
+
+#[test]
+fn test_validate_strict_both_warnings() {
+    let schema = make_schema_with_ops(vec![
+        make_test_op(
+            "bad-cmd-1",
+            Effect::Deployment,
+            Risk::High,
+            Approval::NotRequired,
+        ),
+        make_test_op(
+            "bad-cmd-2",
+            Effect::Destructive,
+            Risk::Low,
+            Approval::NotRequired,
+        ),
+    ]);
+    let warnings = schema.validate_strict().unwrap();
+    // bad-cmd-1: high-risk + not-required
+    // bad-cmd-2: destructive + low-risk AND high-risk(not) — only destructive+low
+    assert_eq!(warnings.len(), 2);
+}
+
+#[test]
+fn test_validate_strict_clean_schema_no_warnings() {
+    let schema = make_schema_with_ops(vec![
+        make_test_op(
+            "safe-read",
+            Effect::ReadOnly,
+            Risk::Low,
+            Approval::NotRequired,
+        ),
+        make_test_op(
+            "safe-deploy",
+            Effect::Deployment,
+            Risk::High,
+            Approval::Required,
+        ),
+        make_test_op(
+            "safe-destroy",
+            Effect::Destructive,
+            Risk::High,
+            Approval::Required,
+        ),
+    ]);
+    let warnings = schema.validate_strict().unwrap();
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for clean schema, got: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn test_validate_strict_propagates_validation_errors() {
+    // Schema with invalid tool name should fail before reaching strict checks
+    let schema = Schema {
+        meta: SchemaMeta {
+            tool: "".to_string(),
+            version: 1,
+            author: None,
+            generated_by: None,
+            generated_with: None,
+            verified: false,
+            verified_at: None,
+            coverage: None,
+            waz_version: None,
+            requires_file: None,
+            requires_file_kind: None,
+            requires_binary: None,
+            keywords: vec![],
+        },
+        operations: vec![],
+    };
+    let result = schema.validate_strict();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("tool name cannot be empty"));
 }
