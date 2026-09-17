@@ -1,4 +1,5 @@
 use crate::context::Context;
+use crate::resolve::ResolveResult;
 use command::Command;
 use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
@@ -8,6 +9,8 @@ pub struct RunResult {
     pub command: String,
     pub working_dir: PathBuf,
     pub status: ExitStatus,
+    pub stdout: String,
+    pub stderr: String,
 }
 
 pub fn run(filepath_arg: Option<&str>, dry_run: bool, cwd: &str) -> Result<RunResult, String> {
@@ -15,22 +18,12 @@ pub fn run(filepath_arg: Option<&str>, dry_run: bool, cwd: &str) -> Result<RunRe
     let project_root = context.project_root.as_deref().unwrap_or(cwd);
     let working_dir = PathBuf::from(project_root);
 
-    // 1. If filepath_arg is None, check for last resolved command
     let resolved_command = if filepath_arg.is_none() {
         let last_cmd_path = working_dir.join(".tmp").join("last_command.json");
-        if last_cmd_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&last_cmd_path) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                    val["command"].as_str().map(|s| s.to_string())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
+        std::fs::read_to_string(&last_cmd_path)
+            .ok()
+            .and_then(|content| serde_json::from_str::<ResolveResult>(&content).ok())
+            .map(|r| r.command)
     } else {
         None
     };
@@ -48,6 +41,8 @@ pub fn run(filepath_arg: Option<&str>, dry_run: bool, cwd: &str) -> Result<RunRe
             command: command_to_run,
             working_dir,
             status,
+            stdout: String::new(),
+            stderr: String::new(),
         });
     }
 
@@ -62,18 +57,17 @@ pub fn run(filepath_arg: Option<&str>, dry_run: bool, cwd: &str) -> Result<RunRe
     };
 
     cmd.current_dir(&working_dir);
-    cmd.stdin(std::process::Stdio::inherit());
-    cmd.stdout(std::process::Stdio::inherit());
-    cmd.stderr(std::process::Stdio::inherit());
 
-    let status = cmd
-        .status()
+    let output = cmd
+        .output()
         .map_err(|e| format!("Failed to execute command: {}", e))?;
 
     Ok(RunResult {
         command: command_to_run,
         working_dir,
-        status,
+        status: output.status,
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     })
 }
 

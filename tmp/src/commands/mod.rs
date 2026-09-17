@@ -1,9 +1,15 @@
+pub mod benchmark;
 pub mod compile;
+pub mod complete;
+pub mod completions;
 pub mod generate;
+pub mod generate_rtk;
 pub mod init;
 pub mod init_agent;
+pub mod output;
 pub mod registry;
 pub mod resolve;
 pub mod run;
 pub mod schema;
+pub mod verify;
 pub mod workflow;

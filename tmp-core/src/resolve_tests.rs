@@ -225,3 +225,84 @@ fn test_heuristic_resolve_token_filling() {
     assert_eq!(fill2.value, "main");
     assert_eq!(fill2.source, "Default value");
 }
+
+fn empty_context() -> Context {
+    Context {
+        cwd: "/dummy".to_string(),
+        project_root: None,
+        build_system: "none".to_string(),
+        file_kind: "standalone".to_string(),
+        script_engine: None,
+        recommended_target: None,
+        package_name: None,
+        packages: vec![],
+        bins: vec![],
+        examples: vec![],
+        features: vec![],
+        profiles: vec![],
+        tests: vec![],
+        benches: vec![],
+        git_branches: vec![],
+        git_remotes: vec![],
+        npm_scripts: vec![],
+    }
+}
+
+#[test]
+fn heuristic_resolve_includes_operation_risk_and_approval_from_schema() {
+    let mut schema = dummy_schema_for_resolve("cargo", "cargo test", vec![]);
+    schema.operations[0].risk = Risk::High;
+    schema.operations[0].approval = Approval::Required;
+    schema.operations[0].effect = Effect::Destructive;
+    schema.operations[0].group = "test".to_string();
+
+    let res = heuristic_resolve("cargo test", &[schema], &empty_context(), None).unwrap();
+    let gate = res
+        .operation
+        .expect("resolve result should include operation gate");
+    assert_eq!(gate.risk, Risk::High);
+    assert_eq!(gate.approval, Approval::Required);
+}
+
+#[test]
+fn old_last_command_json_deserializes_with_operation_none() {
+    let parsed: ResolveResult = serde_json::from_str(r#"{"command":"echo hi"}"#).unwrap();
+    assert_eq!(parsed.command, "echo hi");
+    assert!(parsed.operation.is_none());
+}
+
+#[test]
+fn resolve_result_with_operation_round_trips_command_and_gate() {
+    let original = ResolveResult {
+        command: "cargo test".to_string(),
+        tool: "cargo".to_string(),
+        explanation: "run tests".to_string(),
+        confidence: "high".to_string(),
+        parameters_filled: vec![],
+        operation: Some(OperationGate {
+            effect: Effect::BuildTest,
+            risk: Risk::High,
+            approval: Approval::Required,
+            output_policy: OutputPolicyConfig {
+                mode: OutputMode::TestSummary,
+                raw_retention: None,
+            },
+            verified: true,
+            group: "test".to_string(),
+        }),
+    };
+
+    let value = serde_json::to_value(&original).unwrap();
+    assert_eq!(value["command"], "cargo test");
+    assert_eq!(value["operation"]["risk"], "high");
+    assert_eq!(value["operation"]["approval"], "required");
+    assert_eq!(value["operation"]["effect"], "build-test");
+    assert_eq!(value["operation"]["group"], "test");
+    assert_eq!(value["operation"]["output_policy"]["mode"], "test_summary");
+
+    let parsed: ResolveResult = serde_json::from_value(value).unwrap();
+    let gate = parsed.operation.expect("gate should round-trip");
+    assert_eq!(parsed.command, "cargo test");
+    assert_eq!(gate.risk, Risk::High);
+    assert_eq!(gate.approval, Approval::Required);
+}

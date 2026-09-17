@@ -1,5 +1,5 @@
 use crate::context::Context;
-use crate::schema::{Parameter, Schema};
+use crate::schema::{Approval, Effect, OutputPolicyConfig, Parameter, Risk, Schema};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -11,13 +11,28 @@ pub struct ParameterFill {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OperationGate {
+    pub effect: Effect,
+    pub risk: Risk,
+    pub approval: Approval,
+    pub output_policy: OutputPolicyConfig,
+    pub verified: bool,
+    pub group: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolveResult {
     pub command: String,
+    #[serde(default)]
     pub tool: String,
+    #[serde(default)]
     pub explanation: String,
+    #[serde(default)]
     pub confidence: String,
-    #[serde(alias = "tokens_filled")]
+    #[serde(alias = "tokens_filled", default)]
     pub parameters_filled: Vec<ParameterFill>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation: Option<OperationGate>,
 }
 
 pub fn load_all_schemas(config_path: Option<&Path>) -> Result<Vec<Schema>, String> {
@@ -262,6 +277,14 @@ pub fn heuristic_resolve(
                     "medium".to_string()
                 },
                 parameters_filled,
+                operation: Some(OperationGate {
+                    effect: op.effect,
+                    risk: op.risk,
+                    approval: op.approval,
+                    output_policy: op.output_policy.clone(),
+                    verified: op.verified,
+                    group: op.group.clone(),
+                }),
             });
         }
     }
