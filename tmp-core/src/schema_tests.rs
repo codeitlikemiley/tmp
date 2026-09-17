@@ -438,3 +438,152 @@ fn test_validation_invalid_tool_characters() {
         "Error message should mention 'alphanumeric'"
     );
 }
+
+// --- validate_strict tests ---
+
+/// Helper to create a minimal valid schema with specified operations.
+fn make_schema_with_ops(operations: Vec<Operation>) -> Schema {
+    Schema {
+        meta: SchemaMeta {
+            tool: "test".to_string(),
+            version: 1,
+            author: None,
+            generated_by: None,
+            generated_with: None,
+            verified: false,
+            verified_at: None,
+            coverage: None,
+            waz_version: None,
+            requires_file: None,
+            requires_file_kind: None,
+            requires_binary: None,
+            keywords: vec![],
+        },
+        operations,
+    }
+}
+
+fn make_test_op(command: &str, effect: Effect, risk: Risk, approval: Approval) -> Operation {
+    Operation {
+        command: command.to_string(),
+        description: "test".to_string(),
+        group: "test".to_string(),
+        verified: false,
+        parameters: vec![],
+        surface: Surface::Cli,
+        effect,
+        risk,
+        approval,
+        evidence: vec![],
+        output_policy: OutputPolicyConfig {
+            mode: OutputMode::Raw,
+            raw_retention: None,
+        },
+    }
+}
+
+#[test]
+fn test_validate_strict_high_risk_not_required_warns() {
+    let schema = make_schema_with_ops(vec![make_test_op(
+        "dangerous-cmd",
+        Effect::Network,
+        Risk::High,
+        Approval::NotRequired,
+    )]);
+    let warnings = schema.validate_strict().unwrap();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("high-risk operations should require approval"));
+    assert!(warnings[0].contains("dangerous-cmd"));
+}
+
+#[test]
+fn test_validate_strict_destructive_low_risk_warns() {
+    let schema = make_schema_with_ops(vec![make_test_op(
+        "rm-cmd",
+        Effect::Destructive,
+        Risk::Low,
+        Approval::Required,
+    )]);
+    let warnings = schema.validate_strict().unwrap();
+    assert_eq!(warnings.len(), 1);
+    assert!(warnings[0].contains("destructive effects should not have low risk"));
+    assert!(warnings[0].contains("rm-cmd"));
+}
+
+#[test]
+fn test_validate_strict_both_warnings() {
+    let schema = make_schema_with_ops(vec![
+        make_test_op(
+            "bad-cmd-1",
+            Effect::Deployment,
+            Risk::High,
+            Approval::NotRequired,
+        ),
+        make_test_op(
+            "bad-cmd-2",
+            Effect::Destructive,
+            Risk::Low,
+            Approval::NotRequired,
+        ),
+    ]);
+    let warnings = schema.validate_strict().unwrap();
+    // bad-cmd-1: high-risk + not-required
+    // bad-cmd-2: destructive + low-risk AND high-risk(not) — only destructive+low
+    assert_eq!(warnings.len(), 2);
+}
+
+#[test]
+fn test_validate_strict_clean_schema_no_warnings() {
+    let schema = make_schema_with_ops(vec![
+        make_test_op(
+            "safe-read",
+            Effect::ReadOnly,
+            Risk::Low,
+            Approval::NotRequired,
+        ),
+        make_test_op(
+            "safe-deploy",
+            Effect::Deployment,
+            Risk::High,
+            Approval::Required,
+        ),
+        make_test_op(
+            "safe-destroy",
+            Effect::Destructive,
+            Risk::High,
+            Approval::Required,
+        ),
+    ]);
+    let warnings = schema.validate_strict().unwrap();
+    assert!(
+        warnings.is_empty(),
+        "Expected no warnings for clean schema, got: {:?}",
+        warnings
+    );
+}
+
+#[test]
+fn test_validate_strict_propagates_validation_errors() {
+    // Schema with invalid tool name should fail before reaching strict checks
+    let schema = Schema {
+        meta: SchemaMeta {
+            tool: "".to_string(),
+            version: 1,
+            author: None,
+            generated_by: None,
+            generated_with: None,
+            verified: false,
+            verified_at: None,
+            coverage: None,
+            waz_version: None,
+            requires_file: None,
+            requires_file_kind: None,
+            requires_binary: None,
+            keywords: vec![],
+        },
+        operations: vec![],
+    };
+    let result = schema.validate_strict();
+    assert!(result.is_err());
+    assert!(result.unwrap_err().contains("tool name cannot be empty"));
+}

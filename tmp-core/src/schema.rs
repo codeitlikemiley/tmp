@@ -278,6 +278,29 @@ impl Schema {
         }
         Ok(())
     }
+
+    /// Strict validation that checks for inconsistencies between risk, effect, and approval.
+    ///
+    /// Returns a list of warnings for operations with questionable metadata combinations.
+    pub fn validate_strict(&self) -> Result<Vec<String>, String> {
+        self.validate()?;
+        let mut warnings = Vec::new();
+        for op in &self.operations {
+            if op.risk == Risk::High && op.approval == Approval::NotRequired {
+                warnings.push(format!(
+                    "operation '{}': high-risk operations should require approval",
+                    op.command
+                ));
+            }
+            if op.effect == Effect::Destructive && op.risk == Risk::Low {
+                warnings.push(format!(
+                    "operation '{}': destructive effects should not have low risk",
+                    op.command
+                ));
+            }
+        }
+        Ok(warnings)
+    }
 }
 
 impl<'de> Deserialize<'de> for Schema {
